@@ -43,20 +43,28 @@ export const app = initializeApp(firebaseConfig);
 
 // Initialize Cloud Firestore as the ONE Central Database and Single Source of Truth
 // Using persistent IndexedDB multi-tab cache for seamless offline caching & instant loads
-const activeDbId = envDbId || (firebaseConfig as any).firestoreDatabaseId || "ai-studio-2a6bf0ee-3447-4fcc-b543-9a65f6e88879";
+const rawDbId = envDbId || (firebaseConfig as any).firestoreDatabaseId;
+const isNamedDb = rawDbId && rawDbId !== "(default)" && rawDbId !== "default";
+const activeDbId = isNamedDb ? rawDbId : undefined;
 
 let dbInstance: any;
 try {
-  dbInstance = initializeFirestore(app, {
-    localCache: persistentLocalCache({
-      tabManager: persistentMultipleTabManager()
-    })
-  }, activeDbId);
+  dbInstance = activeDbId
+    ? initializeFirestore(app, {
+        localCache: persistentLocalCache({
+          tabManager: persistentMultipleTabManager()
+        })
+      }, activeDbId)
+    : initializeFirestore(app, {
+        localCache: persistentLocalCache({
+          tabManager: persistentMultipleTabManager()
+        })
+      });
 } catch {
   try {
-    dbInstance = initializeFirestore(app, {}, activeDbId);
+    dbInstance = activeDbId ? initializeFirestore(app, {}, activeDbId) : initializeFirestore(app, {});
   } catch {
-    dbInstance = getFirestore(app, activeDbId);
+    dbInstance = activeDbId ? getFirestore(app, activeDbId) : getFirestore(app);
   }
 }
 export const db = dbInstance;

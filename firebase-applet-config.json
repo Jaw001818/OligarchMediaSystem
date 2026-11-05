@@ -1,12 +1,12 @@
 {
-  "projectId": "gen-lang-client-0477447261",
-  "appId": "1:34714011829:web:1a70466550fc82cfc196fc",
-  "apiKey": "AIzaSyBjr_BdbQjUWaNFffyKd1hovceso5fW3p8",
-  "authDomain": "gen-lang-client-0477447261.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-oligarchmediaman-cc502343-4364-473e-807e-a4261b8b7c61",
-  "storageBucket": "gen-lang-client-0477447261.firebasestorage.app",
-  "messagingSenderId": "34714011829",
-  "measurementId": "",
-  "oAuthClientId": "34714011829-ud67silo5ukfr7od9iaiue2pc215063c.apps.googleusercontent.com",
+  "projectId": "oligarch-media-hr",
+  "appId": "1:860212987735:web:df26450ef7f218504f6012",
+  "apiKey": "AIzaSyCcltFFh4ZkhX7fghxESlnBr4uWt3026Rk",
+  "authDomain": "oligarch-media-hr.firebaseapp.com",
+  "firestoreDatabaseId": "(default)",
+  "storageBucket": "oligarch-media-hr.firebasestorage.app",
+  "messagingSenderId": "860212987735",
+  "measurementId": "G-DK1G6G38HW",
+  "oAuthClientId": "",
   "recaptchaSiteKey": ""
 }

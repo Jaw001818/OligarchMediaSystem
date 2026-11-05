@@ -530,8 +530,10 @@ try {
     const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
     const existingApps = getApps();
     const serverApp = existingApps.find(a => a.name === "server-firestore-sync") || initializeApp(config, "server-firestore-sync");
-    serverDb = getFirestore(serverApp, config.firestoreDatabaseId || "ai-studio-2a6bf0ee-3447-4fcc-b543-9a65f6e88879");
-    console.log("[Server DB] Initialized Cloud Firestore server sync engine:", config.firestoreDatabaseId);
+    const rawDbId = config.firestoreDatabaseId;
+    const isNamed = rawDbId && rawDbId !== "(default)" && rawDbId !== "default";
+    serverDb = isNamed ? getFirestore(serverApp, rawDbId) : getFirestore(serverApp);
+    console.log("[Server DB] Initialized Cloud Firestore server sync engine:", config.projectId);
   }
 } catch (e) {
   console.warn("[Server DB] Firestore sync engine initialization warning:", e);
@@ -1093,6 +1095,21 @@ app.post("/api/persistent-store/restore", (req, res) => {
   const totalCount = Object.values(collections).reduce((sum: number, c: any) => sum + (Array.isArray(c) ? c.length : 0), 0);
   console.log(`[Server DB] Successfully restored ${totalCount} records (isClean=${isClean})`);
   res.json({ success: true, restoredCount: totalCount, isClean });
+});
+
+// Endpoint to retrieve master backup dataset for 1-click database transfer
+app.get("/api/master-backup-dataset", (req, res) => {
+  try {
+    const backupFile = path.join(process.cwd(), "data", "persistent_db_backup_20261105_134741.json");
+    if (fs.existsSync(backupFile)) {
+      const data = JSON.parse(fs.readFileSync(backupFile, "utf-8"));
+      res.json({ success: true, data });
+      return;
+    }
+  } catch (err) {
+    console.error("Failed to read master backup dataset file:", err);
+  }
+  res.status(404).json({ success: false, error: "Master backup file not found" });
 });
 
 // REST API endpoints: Cloud SQL User Management

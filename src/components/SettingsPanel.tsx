@@ -697,6 +697,115 @@ export default function SettingsPanel({
     }
   };
 
+  // Helper to parse backup data and configure restore modal
+  const parseBackupDataAndOpenModal = (raw: any, fileName: string) => {
+    // Unwrap if nested under payload or data
+    const data = raw.payload || raw.data || raw;
+
+    let emps: any[] = [];
+    let atts: any[] = [];
+    let lvs: any[] = [];
+    let acrs: any[] = [];
+    let pers: any[] = [];
+    let pays: any[] = [];
+    let advs: any[] = [];
+    let debts: any[] = [];
+    let nwds: any[] = [];
+    let devScheds: any[] = [];
+    let devSets: any[] = [];
+    let anns: any[] = [];
+    let notifs: any[] = [];
+    let audits: any[] = [];
+    let emails: any[] = [];
+    let confSettings: any = null;
+
+    if (Array.isArray(data)) {
+      if (data.length > 0) {
+        const first = data[0];
+        if (first.devotionLeaderName || first.prayerLeaderName) {
+          devScheds = data;
+        } else if (first.employeeNumber || first.fullName || first.dailyRate) {
+          emps = data;
+        } else if (first.timeIn || first.hoursWorked || (first.date && first.status)) {
+          atts = data;
+        } else if (first.amount && (first.installments || first.empId || first.employeeNumber)) {
+          advs = data;
+        } else if (first.requestId || first.type) {
+          lvs = data;
+        } else {
+          atts = data;
+        }
+      }
+    } else if (typeof data === "object" && data !== null) {
+      emps = Array.isArray(data.employees) ? data.employees : (Array.isArray(data.staff) ? data.staff : []);
+      atts = Array.isArray(data.attendance) ? data.attendance : (Array.isArray(data.timesheets) ? data.timesheets : []);
+      lvs = Array.isArray(data.leave_requests) ? data.leave_requests : (Array.isArray(data.requests) ? data.requests : (Array.isArray(data.leaveRequests) ? data.leaveRequests : []));
+      acrs = Array.isArray(data.attendance_copy_requests) ? data.attendance_copy_requests : (Array.isArray(data.copyRequests) ? data.copyRequests : (Array.isArray(data.attendanceCopyRequests) ? data.attendanceCopyRequests : []));
+      pers = Array.isArray(data.payroll_periods) ? data.payroll_periods : (Array.isArray(data.periods) ? data.periods : (Array.isArray(data.payrollPeriods) ? data.payrollPeriods : []));
+      pays = Array.isArray(data.payroll) ? data.payroll : (Array.isArray(data.payrolls) ? data.payrolls : []);
+      advs = Array.isArray(data.cash_advances) ? data.cash_advances : (Array.isArray(data.advances) ? data.advances : (Array.isArray(data.cashAdvances) ? data.cashAdvances : []));
+      debts = Array.isArray(data.boss_debts) ? data.boss_debts : (Array.isArray(data.debts) ? data.debts : (Array.isArray(data.bossDebts) ? data.bossDebts : []));
+      nwds = Array.isArray(data.no_work_days) ? data.no_work_days : (Array.isArray(data.holidays) ? data.holidays : (Array.isArray(data.nowork_days) ? data.nowork_days : []));
+      devScheds = Array.isArray(data.devotion_schedules) ? data.devotion_schedules : (Array.isArray(data.devotions) ? data.devotions : (Array.isArray(data.devotionSchedules) ? data.devotionSchedules : []));
+      devSets = Array.isArray(data.devotion_settings) ? data.devotion_settings : (Array.isArray(data.devotionSettings) ? data.devotionSettings : []);
+      anns = Array.isArray(data.announcements) ? data.announcements : [];
+      notifs = Array.isArray(data.notifications) ? data.notifications : [];
+      audits = Array.isArray(data.audit_logs) ? data.audit_logs : [];
+      emails = Array.isArray(data.email_logs) ? data.email_logs : [];
+      if (data.settings && typeof data.settings === "object") {
+        confSettings = data.settings;
+      }
+    }
+
+    const total = 
+      emps.length + 
+      atts.length + 
+      lvs.length + 
+      acrs.length + 
+      pers.length + 
+      pays.length + 
+      advs.length + 
+      debts.length + 
+      nwds.length +
+      devScheds.length +
+      devSets.length +
+      anns.length +
+      notifs.length +
+      audits.length +
+      emails.length;
+
+    if (total === 0 && !confSettings) {
+      triggerToast("No recognizable HR dataset tables found in backup file.");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
+    setRestoreModal({
+      isOpen: true,
+      fileName,
+      parsedPayload: {
+        employees: emps,
+        attendance: atts,
+        leave_requests: lvs,
+        attendance_copy_requests: acrs,
+        payroll_periods: pers,
+        payroll: pays,
+        cash_advances: advs,
+        boss_debts: debts,
+        no_work_days: nwds,
+        devotion_schedules: devScheds,
+        devotion_settings: devSets,
+        announcements: anns,
+        notifications: notifs,
+        audit_logs: audits,
+        email_logs: emails,
+        settings: confSettings
+      },
+      restoreMode: "merge",
+      totalCount: total
+    });
+  };
+
   // Inspect and parse backup file before restoring
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -725,113 +834,7 @@ export default function SettingsPanel({
           return;
         }
 
-        // Unwrap if nested under payload or data
-        const data = raw.payload || raw.data || raw;
-
-        // Extract collections with wide alias compatibility
-        let emps: any[] = [];
-        let atts: any[] = [];
-        let lvs: any[] = [];
-        let acrs: any[] = [];
-        let pers: any[] = [];
-        let pays: any[] = [];
-        let advs: any[] = [];
-        let debts: any[] = [];
-        let nwds: any[] = [];
-        let devScheds: any[] = [];
-        let devSets: any[] = [];
-        let anns: any[] = [];
-        let notifs: any[] = [];
-        let audits: any[] = [];
-        let emails: any[] = [];
-        let confSettings: any = null;
-
-        if (Array.isArray(data)) {
-          // Flat array of records - inspect first item
-          if (data.length > 0) {
-            const first = data[0];
-            if (first.devotionLeaderName || first.prayerLeaderName) {
-              devScheds = data;
-            } else if (first.employeeNumber || first.fullName || first.dailyRate) {
-              emps = data;
-            } else if (first.timeIn || first.hoursWorked || (first.date && first.status)) {
-              atts = data;
-            } else if (first.amount && (first.installments || first.empId || first.employeeNumber)) {
-              advs = data;
-            } else if (first.requestId || first.type) {
-              lvs = data;
-            } else {
-              atts = data;
-            }
-          }
-        } else if (typeof data === "object" && data !== null) {
-          emps = Array.isArray(data.employees) ? data.employees : (Array.isArray(data.staff) ? data.staff : []);
-          atts = Array.isArray(data.attendance) ? data.attendance : (Array.isArray(data.timesheets) ? data.timesheets : []);
-          lvs = Array.isArray(data.leave_requests) ? data.leave_requests : (Array.isArray(data.requests) ? data.requests : (Array.isArray(data.leaveRequests) ? data.leaveRequests : []));
-          acrs = Array.isArray(data.attendance_copy_requests) ? data.attendance_copy_requests : (Array.isArray(data.copyRequests) ? data.copyRequests : (Array.isArray(data.attendanceCopyRequests) ? data.attendanceCopyRequests : []));
-          pers = Array.isArray(data.payroll_periods) ? data.payroll_periods : (Array.isArray(data.periods) ? data.periods : (Array.isArray(data.payrollPeriods) ? data.payrollPeriods : []));
-          pays = Array.isArray(data.payroll) ? data.payroll : (Array.isArray(data.payrolls) ? data.payrolls : []);
-          advs = Array.isArray(data.cash_advances) ? data.cash_advances : (Array.isArray(data.advances) ? data.advances : (Array.isArray(data.cashAdvances) ? data.cashAdvances : []));
-          debts = Array.isArray(data.boss_debts) ? data.boss_debts : (Array.isArray(data.debts) ? data.debts : (Array.isArray(data.bossDebts) ? data.bossDebts : []));
-          nwds = Array.isArray(data.no_work_days) ? data.no_work_days : (Array.isArray(data.holidays) ? data.holidays : (Array.isArray(data.nowork_days) ? data.nowork_days : []));
-          devScheds = Array.isArray(data.devotion_schedules) ? data.devotion_schedules : (Array.isArray(data.devotions) ? data.devotions : (Array.isArray(data.devotionSchedules) ? data.devotionSchedules : []));
-          devSets = Array.isArray(data.devotion_settings) ? data.devotion_settings : (Array.isArray(data.devotionSettings) ? data.devotionSettings : []);
-          anns = Array.isArray(data.announcements) ? data.announcements : [];
-          notifs = Array.isArray(data.notifications) ? data.notifications : [];
-          audits = Array.isArray(data.audit_logs) ? data.audit_logs : [];
-          emails = Array.isArray(data.email_logs) ? data.email_logs : [];
-          if (data.settings && typeof data.settings === "object") {
-            confSettings = data.settings;
-          }
-        }
-
-        const total = 
-          emps.length + 
-          atts.length + 
-          lvs.length + 
-          acrs.length + 
-          pers.length + 
-          pays.length + 
-          advs.length + 
-          debts.length + 
-          nwds.length +
-          devScheds.length +
-          devSets.length +
-          anns.length +
-          notifs.length +
-          audits.length +
-          emails.length;
-
-        if (total === 0 && !confSettings) {
-          triggerToast("No recognizable HR dataset tables found in backup file.");
-          if (fileInputRef.current) fileInputRef.current.value = "";
-          return;
-        }
-
-        setRestoreModal({
-          isOpen: true,
-          fileName: file.name,
-          parsedPayload: {
-            employees: emps,
-            attendance: atts,
-            leave_requests: lvs,
-            attendance_copy_requests: acrs,
-            payroll_periods: pers,
-            payroll: pays,
-            cash_advances: advs,
-            boss_debts: debts,
-            no_work_days: nwds,
-            devotion_schedules: devScheds,
-            devotion_settings: devSets,
-            announcements: anns,
-            notifications: notifs,
-            audit_logs: audits,
-            email_logs: emails,
-            settings: confSettings
-          },
-          restoreMode: "merge",
-          totalCount: total
-        });
+        parseBackupDataAndOpenModal(raw, file.name);
       } catch (err) {
         console.error(err);
         triggerToast("Error processing backup file: " + (err instanceof Error ? err.message : String(err)));
@@ -839,6 +842,26 @@ export default function SettingsPanel({
       }
     };
     reader.readAsText(file);
+  };
+
+  // 1-Click Master Dataset Transfer
+  const [transferringMaster, setTransferringMaster] = useState(false);
+  const handle1ClickMasterTransfer = async () => {
+    try {
+      setTransferringMaster(true);
+      triggerToast("Retrieving full master backup snapshot (11 staff, attendance, payroll)...");
+      const res = await fetch("/api/master-backup-dataset");
+      const json = await res.json();
+      if (!json.success || !json.data) {
+        throw new Error(json.error || "Failed to load master dataset.");
+      }
+      parseBackupDataAndOpenModal(json.data, "master-snapshot-11-staff.json");
+    } catch (err) {
+      console.error(err);
+      triggerToast("Error loading master snapshot: " + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setTransferringMaster(false);
+    }
   };
 
   // Perform full or merged database restoration
@@ -928,6 +951,42 @@ export default function SettingsPanel({
         } catch (setErr) {
           console.warn("Settings restore notice:", setErr);
         }
+      }
+
+      // 5. Directly sync all restored collections to Cloud Firestore
+      try {
+        setRestoreProgress({ current: 80, total: 100, message: "Syncing records to Cloud Firestore..." });
+        const p: any = payload;
+        const firestoreCollectionsMap: Record<string, any[]> = {
+          employees: p.employees || [],
+          attendance: p.attendance || [],
+          requests: p.leave_requests || p.requests || [],
+          attendanceCopyRequests: p.attendance_copy_requests || p.attendanceCopyRequests || [],
+          cashAdvances: p.cash_advances || p.cashAdvances || [],
+          bossDebts: p.boss_debts || p.bossDebts || [],
+          payroll_periods: p.payroll_periods || [],
+          payrolls: p.payroll || p.payrolls || [],
+          no_work_days: p.no_work_days || [],
+          devotion_schedules: p.devotion_schedules || []
+        };
+
+        for (const [colName, items] of Object.entries(firestoreCollectionsMap)) {
+          if (Array.isArray(items) && items.length > 0) {
+            for (let i = 0; i < items.length; i += 20) {
+              const chunk = items.slice(i, i + 20);
+              await Promise.allSettled(
+                chunk.map(async (docData: any) => {
+                  if (!docData) return;
+                  const docId = docData.id || `${docData.employeeNumber || ""}_${docData.date || Date.now()}`;
+                  const docRef = doc(db, colName, String(docId));
+                  return setDoc(docRef, docData, { merge: true });
+                })
+              );
+            }
+          }
+        }
+      } catch (firestoreSyncErr) {
+        console.warn("Client Firestore backup sync notice:", firestoreSyncErr);
       }
 
       setRestoreProgress({ current: 100, total: 100, message: "Restoration complete!" });
@@ -1681,6 +1740,27 @@ export default function SettingsPanel({
               )}
             </button>
           </div>
+
+          {/* 1-Click Master Dataset Transfer */}
+          <button
+            type="button"
+            onClick={handle1ClickMasterTransfer}
+            disabled={transferringMaster || restoring}
+            className="px-4 py-2 text-xs bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold rounded-xl flex items-center gap-1.5 cursor-pointer transition-colors shadow-xs"
+            title="Transfer all 11 official staff members, past attendance logs, payroll cutoffs, and settings into this database"
+          >
+            {transferringMaster ? (
+              <>
+                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                <span>Loading Master Snapshot...</span>
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>⚡ 1-Click Transfer All Data (11 Staff & Payroll)</span>
+              </>
+            )}
+          </button>
         </div>
       </div>
 

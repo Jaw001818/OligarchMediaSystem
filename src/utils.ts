@@ -1,29 +1,8 @@
 import { Employee, Attendance, DayOfWeek, DaySchedule, WeeklySchedule, ScheduleOverride, EffectiveSchedule, SalaryRateRecord } from "./types";
-import { OFFICIAL_JOEMARIE_PANGAN } from "./data/officialStaffBackup";
+import { OFFICIAL_JOEMARIE_PANGAN, OFFICIAL_STAFF_ROSTER } from "./data/officialStaffBackup";
 
 export const generateMockEmployees = (): Employee[] => {
-  return [
-    {
-      id: "emp-001",
-      employeeNumber: "001",
-      fullName: "Gideon Balboa",
-      email: "gideon.balboa@example.com",
-      phone: "+63 917 123 4567",
-      department: "Management",
-      position: "Operations Director",
-      birthday: "1985-11-22",
-      salary: 150000,
-      dailyRate: 6818.18,
-      allowance: 10000,
-      otRate: 852.27,
-      status: "Active",
-      profilePicture: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&q=80&w=120",
-      employmentType: "Full-time",
-      dateHired: "2020-01-15",
-      pin: "1234"
-    },
-    OFFICIAL_JOEMARIE_PANGAN
-  ];
+  return OFFICIAL_STAFF_ROSTER;
 };
 
 export function formatTimeForDB(timeStr: string | null) {
@@ -1097,10 +1076,11 @@ export async function seedInitialDataIfEmpty() {
   try {
     const snap = await getDocs(collection(db, "employees"));
     if (snap.empty) {
+      const { doc, setDoc } = await import("./firebase");
       const mockData = generateMockEmployees();
       for (const emp of mockData) {
-        const { id, ...data } = emp;
-        await addDoc(collection(db, "employees"), data);
+        const effectiveId = emp.id || `emp-${emp.employeeNumber}`;
+        await setDoc(doc(db, "employees", effectiveId), emp, { merge: true });
       }
     }
 
