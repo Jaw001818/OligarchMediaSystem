@@ -1,0 +1,137 @@
+@import url('https://fonts.googleapis.com/css2?family=Alex+Brush&family=Caveat:wght@600;700&family=Great+Vibes&family=Inter:wght@400;500;600;700;850;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+.font-calligraphy {
+  font-family: 'Great Vibes', 'Alex Brush', 'Caveat', cursive;
+}
+
+:root {
+  --bg-color: #F8FAFC;          /* slate-50 */
+  --card-color: #FFFFFF;        /* pure white cards */
+  --sidebar-color: #F1F5F9;     /* slate-100 sidebar */
+  --border-color: #E2E8F0;      /* slate-200 subtle borders */
+  --text-bright-color: #0F172A; /* slate-900 high contrast */
+  --text-dim-color: #475569;    /* slate-600 readable subtext */
+  --accent-color: #0284C7;      /* sky-700 / blue-600 focus accent */
+  --accent-text: #FFFFFF;
+  --input-bg: #FFFFFF;
+}
+
+/* Toggle dark mode class added to html/body */
+.dark {
+  --bg-color: #0F1115;          /* premium dark background */
+  --card-color: #1A1D23;        /* premium deep carbon cards */
+  --sidebar-color: #16191E;     /* premium sidebar */
+  --border-color: rgba(255, 255, 255, 0.08); /* crisp subtle dark dividers */
+  --text-bright-color: #F8FAFC; /* crisp high-contrast off-white text */
+  --text-dim-color: #94A3B8;    /* premium slate-400 gray text */
+  --accent-color: #38BDF8;      /* active laser-sky blue accent */
+  --accent-text: #0F172A;
+  --input-bg: #16191E;          /* high contrast input background */
+}
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  /* Dynamically map Elegant Theme Palette directly to CSS Variables */
+  --color-zinc-805: var(--border-color);
+  --color-zinc-808: var(--border-color);
+  --color-zinc-850: #141416;
+  --color-zinc-904: #0a0a0b;
+
+  /* Accent overrides to support high-contrast dynamic triggers */
+  --color-blue-400: var(--accent-color);
+  --color-blue-500: var(--accent-color);
+  --color-blue-600: var(--accent-color);
+  --color-blue-700: var(--accent-color);
+  --color-blue-800: var(--accent-color);
+}
+
+/* Manual class-based dark mode variant selector */
+@custom-variant dark (.dark &);
+
+@layer base {
+  body {
+    background-color: var(--bg-color) !important;
+    color: var(--text-bright-color) !important;
+    font-family: 'Inter', system-ui, sans-serif;
+    transition: background-color 0.3s ease-in-out, color 0.3s ease-in-out;
+  }
+
+  /* Structural block transitions and alignments */
+  div, section, header, footer, aside, main, article {
+    transition: background-color 0.3s ease-in-out, border-color 0.3s ease-in-out, color 0.3s ease-in-out;
+  }
+
+  /* Make sure standard classes respect variables */
+  div.bg-white, section.bg-white, article.bg-white, aside.bg-white, main.bg-white {
+    background-color: var(--card-color) !important;
+  }
+
+  div.bg-zinc-50, section.bg-zinc-50, article.bg-zinc-50 {
+    background-color: var(--bg-color) !important;
+  }
+
+  div.bg-zinc-100, section.bg-zinc-100, article.bg-zinc-100 {
+    background-color: var(--sidebar-color) !important;
+  }
+
+  /* Force optimal text contrast settings in both modes */
+  
+
+  
+
+  
+
+  /* Force optimal border colors */
+  .border-zinc-200, .border-zinc-150, .border-zinc-250, .border-zinc-100 {
+    border-color: var(--border-color) !important;
+  }
+
+  /* Standard controls and inputs - absolute maximum typing readability */
+  input, select, textarea, option {
+    background-color: var(--input-bg) !important;
+    color: var(--text-bright-color) !important;
+    border: 1px solid var(--border-color) !important;
+    font-family: inherit;
+    transition: all 0.2s ease;
+  }
+
+  input:focus, select:focus, textarea:focus {
+    border-color: var(--accent-color) !important;
+    outline: none !important;
+    box-shadow: 0 0 0 2px var(--border-color) !important;
+  }
+
+  input::placeholder, textarea::placeholder {
+    color: var(--text-dim-color) !important;
+    opacity: 0.6;
+  }
+
+  /* Ensure active tab states have high contrast */
+  .bg-indigo-600, .bg-blue-600 {
+    background-color: var(--accent-color) !important;
+    color: var(--accent-text) !important;
+  }
+
+  .hover\:bg-blue-700:hover {
+    background-color: var(--accent-color) !important;
+    opacity: 0.9;
+  }
+}
+
+@layer utilities {
+  /* Printable page landscape configurations for payslips */
+  @media print {
+    body * {
+      visibility: hidden;
+    }
+    .print\:block, .print\:block * {
+      visibility: visible;
+    }
+    .print\:hidden {
+      display: none !important;
+    }
+  }
+}

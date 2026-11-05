@@ -1,0 +1,8 @@
+{
+  "name": "OLIGARCH MEDIA MANAGEMENT",
+  "description": "An admin-controlled HR system for tracking employee attendance, managing payroll, and handling leave requests through a public portal.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

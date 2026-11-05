@@ -1,0 +1,278 @@
+{
+  "entities": {
+    "Employee": {
+      "title": "Employee",
+      "description": "Represents an employee record. Employees do not have login credentials.",
+      "type": "object",
+      "properties": {
+        "employeeNumber": { "type": "string", "description": "Unique identifier for employee code matching, e.g. EMP-001" },
+        "fullName": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "phone": { "type": "string" },
+        "department": { "type": "string" },
+        "position": { "type": "string" },
+        "birthday": { "type": "string", "format": "date" },
+        "salary": { "type": "number", "description": "Monthly Basic Salary" },
+        "dailyRate": { "type": "number", "description": "Calculated daily salary rate" },
+        "allowance": { "type": "number" },
+        "otRate": { "type": "number" },
+        "status": { "type": "string", "enum": ["Active", "Inactive", "Resigned"] },
+        "profilePicture": { "type": "string", "description": "Profile picture URL or avatar initial" },
+        "employmentType": { "type": "string", "enum": ["Full-time", "Part-time", "Contract", "Intern"] },
+        "dateHired": { "type": "string", "format": "date" },
+        "weeklySchedule": { "type": "object", "description": "Per-day weekly schedule configuration for Monday through Sunday" },
+        "scheduleOverride": { "type": "object", "description": "Current-day shift change override for real-time schedule adjustments" }
+      },
+      "required": ["employeeNumber", "fullName", "email", "department", "position", "salary"]
+    },
+    "Attendance": {
+      "title": "Attendance",
+      "description": "Daily employee attendance logged by Admin",
+      "type": "object",
+      "properties": {
+        "employeeId": { "type": "string" },
+        "employeeNumber": { "type": "string" },
+        "employeeName": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "timeIn": { "type": "string" },
+        "breakStart": { "type": "string" },
+        "breakEnd": { "type": "string" },
+        "timeOut": { "type": "string" },
+        "hoursWorked": { "type": "number" },
+        "lateMinutes": { "type": "number" },
+        "otHours": { "type": "number" },
+        "status": { "type": "string", "enum": ["Present", "Late", "Absent", "On Break", "Timed Out"] }
+      },
+      "required": ["employeeId", "date", "status"]
+    },
+    "LeaveRequest": {
+      "title": "LeaveRequest",
+      "description": "Requests made by employees through the public portal",
+      "type": "object",
+      "properties": {
+        "requestId": { "type": "string" },
+        "employeeId": { "type": "string" },
+        "employeeNumber": { "type": "string" },
+        "employeeName": { "type": "string" },
+        "type": { "type": "string", "enum": ["Paid Leave", "Birthday Leave", "Absent Notice"] },
+        "startDate": { "type": "string", "format": "date" },
+        "endDate": { "type": "string", "format": "date" },
+        "reason": { "type": "string" },
+        "attachment": { "type": "string" },
+        "status": { "type": "string", "enum": ["Pending", "Approved", "Rejected"] },
+        "adminNotes": { "type": "string" },
+        "submittedAt": { "type": "string" },
+        "trackingNumber": { "type": "string" }
+      },
+      "required": ["requestId", "employeeId", "type", "status", "submittedAt", "trackingNumber"]
+    },
+    "Payroll": {
+      "title": "Payroll",
+      "description": "Calculated employee salaries with overtime, allowances, and deductions",
+      "type": "object",
+      "properties": {
+        "payrollId": { "type": "string" },
+        "employeeId": { "type": "string" },
+        "employeeNumber": { "type": "string" },
+        "fullName": { "type": "string" },
+        "cutoffPeriodId": { "type": "string" },
+        "basicSalary": { "type": "number" },
+        "dailyRate": { "type": "number" },
+        "allowance": { "type": "number" },
+        "otPay": { "type": "number" },
+        "paidLeavePay": { "type": "number" },
+        "birthdayLeavePay": { "type": "number" },
+        "deductions": { "type": "number" },
+        "absentDeduction": { "type": "number" },
+        "lateDeduction": { "type": "number" },
+        "finalSalary": { "type": "number" },
+        "status": { "type": "string", "enum": ["Draft", "Released", "Paid"] },
+        "generatedAt": { "type": "string" }
+      },
+      "required": ["payrollId", "employeeId", "cutoffPeriodId", "finalSalary", "status"]
+    },
+    "PayrollPeriod": {
+      "title": "PayrollPeriod",
+      "description": "Customizable payroll cycles",
+      "type": "object",
+      "properties": {
+        "periodId": { "type": "string" },
+        "name": { "type": "string" },
+        "startDate": { "type": "string", "format": "date" },
+        "endDate": { "type": "string", "format": "date" },
+        "releaseDate": { "type": "string", "format": "date" },
+        "status": { "type": "string", "enum": ["Open", "Processing", "Completed"] }
+      },
+      "required": ["periodId", "name", "startDate", "endDate", "releaseDate", "status"]
+    },
+    "Announcement": {
+      "title": "Announcement",
+      "description": "Admin bulk broadcasts shown to employees on the portal",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "sender": { "type": "string" },
+        "isArchived": { "type": "boolean", "description": "Flag to archive older announcements to keep communication list focused." }
+      },
+      "required": ["title", "message", "createdAt"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "Automated status update notifications sent to employees.",
+      "type": "object",
+      "properties": {
+        "notificationId": { "type": "string" },
+        "employeeId": { "type": "string", "description": "Target employee who receives the notification" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "type": { "type": "string", "enum": ["leave_status", "general"] },
+        "leaveRequestId": { "type": "string" },
+        "status": { "type": "string", "enum": ["unread", "read"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["notificationId", "employeeId", "title", "message", "type", "status", "createdAt"]
+    },
+    "AttendanceCopyRequest": {
+      "title": "AttendanceCopyRequest",
+      "description": "Employee requests for a copy of their attendance logs within a date range",
+      "type": "object",
+      "properties": {
+        "employeeId": { "type": "string" },
+        "employeeNumber": { "type": "string" },
+        "employeeName": { "type": "string" },
+        "startDate": { "type": "string" },
+        "endDate": { "type": "string" },
+        "reason": { "type": "string" },
+        "status": { "type": "string", "enum": ["Pending", "Approved", "Rejected"] },
+        "adminNotes": { "type": "string" },
+        "submittedAt": { "type": "string" },
+        "approvedAt": { "type": "string" },
+        "trackingNumber": { "type": "string" }
+      },
+      "required": ["employeeId", "employeeNumber", "employeeName", "startDate", "endDate", "reason", "status", "submittedAt", "trackingNumber"]
+    },
+    "CashAdvance": {
+      "title": "CashAdvance",
+      "description": "Employee cash advances / salary loans",
+      "type": "object",
+      "properties": {
+        "referenceId": { "type": "string" },
+        "employeeId": { "type": "string" },
+        "employeeName": { "type": "string" },
+        "amount": { "type": "number" },
+        "remainingBalance": { "type": "number" },
+        "dateGranted": { "type": "string" },
+        "status": { "type": "string", "enum": ["Pending", "Active", "Fully Paid", "Cancelled"] },
+        "deductionMethod": { "type": "string", "enum": ["Full", "Split", "Manual"] },
+        "splitCount": { "type": "number" },
+        "deductedInPeriodId": { "type": "string" },
+        "notes": { "type": "string" }
+      },
+      "required": ["referenceId", "employeeId", "amount", "remainingBalance", "dateGranted", "status"]
+    },
+    "BossDebt": {
+      "title": "BossDebt",
+      "description": "Company debts or credits owed to employees",
+      "type": "object",
+      "properties": {
+        "referenceId": { "type": "string" },
+        "employeeId": { "type": "string" },
+        "employeeName": { "type": "string" },
+        "amount": { "type": "number" },
+        "remainingBalance": { "type": "number" },
+        "dateGranted": { "type": "string" },
+        "status": { "type": "string", "enum": ["Pending", "Active", "Fully Paid", "Cancelled"] },
+        "payoutMethod": { "type": "string", "enum": ["Full", "Split", "Manual"] },
+        "splitCount": { "type": "number" },
+        "paidInPeriodId": { "type": "string" },
+        "notes": { "type": "string" }
+      },
+      "required": ["referenceId", "employeeId", "amount", "remainingBalance", "dateGranted", "status"]
+    },
+    "NoWorkDay": {
+      "title": "NoWorkDay",
+      "description": "Official company declared non-working days or suspensions",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string" },
+        "label": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["date", "label"]
+    },
+    "DevotionSchedule": {
+      "title": "DevotionSchedule",
+      "description": "Morning devotion and prayer schedules",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string" },
+        "devotionLeaderName": { "type": "string" },
+        "prayerLeaderName": { "type": "string" },
+        "topic": { "type": "string" },
+        "scripture": { "type": "string" },
+        "notes": { "type": "string" }
+      },
+      "required": ["date", "devotionLeaderName", "prayerLeaderName"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "System event and administrative activity logs",
+      "type": "object",
+      "properties": {
+        "user": { "type": "string" },
+        "action": { "type": "string" },
+        "details": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["action", "timestamp"]
+    },
+    "EmailLog": {
+      "title": "EmailLog",
+      "description": "Outbound email delivery and status logs",
+      "type": "object",
+      "properties": {
+        "to": { "type": "string" },
+        "subject": { "type": "string" },
+        "status": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["to", "status", "timestamp"]
+    },
+    "DeletedRecord": {
+      "title": "DeletedRecord",
+      "description": "Recycle bin archive preserving deleted records",
+      "type": "object",
+      "properties": {
+        "originalCollection": { "type": "string" },
+        "originalId": { "type": "string" },
+        "deletedAt": { "type": "string" },
+        "deletedBy": { "type": "string" },
+        "data": { "type": "object" }
+      },
+      "required": ["originalCollection", "originalId", "deletedAt"]
+    }
+  },
+  "firestore": {
+    "employees": { "schema": "Employee", "description": "Primary employee registry" },
+    "attendance": { "schema": "Attendance", "description": "Attendance tracking transactions" },
+    "leave_requests": { "schema": "LeaveRequest", "description": "Requests made by employees" },
+    "payroll": { "schema": "Payroll", "description": "Calculated salaries per employee per cutoff" },
+    "payroll_periods": { "schema": "PayrollPeriod", "description": "Cutoff periods definitions" },
+    "announcements": { "schema": "Announcement", "description": "Broad announcements broadcasted to all employees" },
+    "notifications": { "schema": "Notification", "description": "Notifications for individual employees" },
+    "attendance_copy_requests": { "schema": "AttendanceCopyRequest", "description": "Requests by employees for authorized copies of their attendance reports" },
+    "cash_advances": { "schema": "CashAdvance", "description": "Cash advances and deductions" },
+    "boss_debts": { "schema": "BossDebt", "description": "Boss debts and credits" },
+    "no_work_days": { "schema": "NoWorkDay", "description": "Company non-working day records" },
+    "devotion_schedules": { "schema": "DevotionSchedule", "description": "Devotion and prayer schedules" },
+    "devotion_settings": { "schema": "DevotionSchedule", "description": "Devotion flyer settings" },
+    "settings": { "schema": "Employee", "description": "System settings" },
+    "audit_logs": { "schema": "AuditLog", "description": "System audit trail" },
+    "email_logs": { "schema": "EmailLog", "description": "Email delivery logs" },
+    "deleted_records": { "schema": "DeletedRecord", "description": "Recycle bin and tombstone store" }
+  }
+}

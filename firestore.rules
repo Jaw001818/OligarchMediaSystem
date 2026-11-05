@@ -1,0 +1,138 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'hr.oligarchmedia@gmail.com' ||
+        request.auth.token.email == 'oligarchmediaph@gmail.com' ||
+        (request.auth.token.email_verified == true && request.auth.token.email.matches('.*@oligarchmedia.*'))
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128;
+    }
+
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Company Settings (Shift parameters, work hours, grace periods)
+    // Readable by kiosk portal and staff; writable only by Admin
+    match /settings/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Employees Roster (Profiles, designations, schedules)
+    // Readable for portal selection and birthday tracker; writable only by Admin
+    match /employees/{employeeId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Attendance Records (Time In, Time Out, Breaks, Overtime)
+    // Accessible by employees for daily punching; deletions restricted to Admin
+    match /attendance/{attendanceId} {
+      allow read: if true;
+      allow create: if isValidId(attendanceId);
+      allow update: if isValidId(attendanceId);
+      allow delete: if isAdmin();
+    }
+
+    // Payroll Records (Confidential salary computation, 13th month, net vouchers)
+    // Strictly restricted to authorized HR/Admin
+    match /payroll/{payrollId} {
+      allow read, write: if isAdmin();
+    }
+
+    // Payroll Cutoff Periods
+    // Strictly restricted to authorized HR/Admin
+    match /payroll_periods/{periodId} {
+      allow read, write: if isAdmin();
+    }
+
+    // Leave & Absence Requests
+    // Submitted by employees; approved/managed by Admin
+    match /leave_requests/{requestId} {
+      allow read: if true;
+      allow create: if isValidId(requestId);
+      allow update, delete: if isAdmin();
+    }
+
+    // Attendance Copy Requests
+    match /attendance_copy_requests/{requestId} {
+      allow read: if true;
+      allow create: if isValidId(requestId);
+      allow update, delete: if isAdmin();
+    }
+
+    // Cash Advances & Financial Loans (Confidential)
+    match /cash_advances/{id} {
+      allow read, write: if isAdmin();
+    }
+
+    // Boss Debts & Personal Advances (Confidential)
+    match /boss_debts/{id} {
+      allow read, write: if isAdmin();
+    }
+
+    // Declared Non-Working Days / Holidays
+    match /no_work_days/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Devotion & Prayer Schedules
+    // Publicly readable so daily flyer and portal prayer cards load
+    match /devotion_schedules/{scheduleId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Devotion Flyer Settings & Rotation State
+    match /devotion_settings/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Broadcast Announcements / Bulletin
+    match /announcements/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // In-App Notifications
+    match /notifications/{id} {
+      allow read, create, update: if true;
+      allow delete: if isAdmin();
+    }
+
+    // Audit Logs (Append-only by system, read restricted to Admin)
+    match /audit_logs/{id} {
+      allow create: if isValidId(id);
+      allow read: if isAdmin();
+      allow update, delete: if false;
+    }
+
+    // Email Dispatch Transaction Logs
+    match /email_logs/{id} {
+      allow create: if isValidId(id);
+      allow read: if isAdmin();
+      allow update, delete: if false;
+    }
+
+    // Deleted Records (Global tombstone registry to prevent resurrection)
+    match /deleted_records/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+  }
+}
