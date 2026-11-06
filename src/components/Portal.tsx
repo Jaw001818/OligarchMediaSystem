@@ -2370,62 +2370,78 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
         </div>
       )}
 
-      {/* Portal Hero */}
-      <header className="mb-8 text-center">
-        <span className="px-3 py-1 bg-blue-50 dark:bg-zinc-800 text-blue-600 dark:text-blue-400 text-xs font-mono font-bold rounded-full uppercase tracking-widest gap-1 inline-flex items-center">
-          <Sparkles className="w-3 h-3" /> Public HR Portal
-        </span>
-        <h1 className="text-3xl font-extrabold text-zinc-905 dark:text-white mt-3 tracking-tight">Oligarch Media Hub</h1>
-        <p className="text-zinc-500 dark:text-zinc-400 text-sm mt-2 max-w-md mx-auto">
-          Secure, direct self-service requests for employees. Log birthday plans, emergency leaves, or download tracking vouchers.
-        </p>
+      {/* Modernized Portal Header */}
+      <header className="mb-6 text-center space-y-3">
+        <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-600 dark:text-indigo-400 text-xs font-mono font-bold tracking-wider uppercase">
+          <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+          <span>Oligarch Media Graphic Design Studio</span>
+        </div>
+
+        <div className="flex flex-col items-center">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-sky-400 flex items-center justify-center text-white font-black text-xl shadow-lg ring-4 ring-indigo-500/20 mb-2">
+            OM
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+            Employee Operations Hub
+          </h1>
+          <p className="text-slate-500 dark:text-slate-400 text-xs sm:text-sm mt-1 max-w-md mx-auto">
+            Night Shift (10:00 PM – 7:00 AM PHT) • Live punch clock, devotion roster, and official leave vouchers.
+          </p>
+        </div>
+
+        {/* Live Manila Time Pill */}
+        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200/80 dark:border-white/10 text-xs font-mono">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="text-slate-500 dark:text-slate-400">Manila Time:</span>
+          <strong className="text-slate-900 dark:text-white tabular-nums">{currentTime.toLocaleTimeString()}</strong>
+        </div>
       </header>
 
-      {/* Tabs */}
-      <div className={`grid ${verifiedEmployee ? "grid-cols-2 sm:grid-cols-3 md:flex md:flex-wrap" : "grid-cols-3 md:flex md:flex-wrap"} border border-zinc-200 dark:border-zinc-800/80 mb-8 max-w-2xl mx-auto justify-center bg-zinc-50 dark:bg-zinc-900 p-1.5 rounded-3xl md:rounded-full shadow-inner gap-1.5`}>
+      {/* Modern Segmented Navigation Tabs */}
+      <div className={`grid ${verifiedEmployee ? "grid-cols-2 sm:grid-cols-3 md:flex md:flex-wrap" : "grid-cols-3 md:flex md:flex-wrap"} border border-slate-200/80 dark:border-white/10 mb-8 max-w-2xl mx-auto justify-center bg-slate-100 dark:bg-slate-900 p-1.5 rounded-2xl shadow-inner gap-1.5`}>
         {!verifiedEmployee ? (
           <>
             <button
               onClick={() => {
                 setActivePortalTab("timetracking");
               }}
-              className={`px-2 sm:px-3 py-1.5 rounded-full text-[11px] sm:text-xs font-semibold uppercase tracking-wider transition-all duration-205 flex items-center gap-1.5 justify-center w-full md:w-auto ${
+              className={`px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200 flex items-center gap-1.5 justify-center w-full md:w-auto cursor-pointer ${
                 activePortalTab === "timetracking"
-                  ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50 shadow-sm"
-                  : "text-zinc-550 dark:text-zinc-400 hover:text-zinc-900"
+                  ? "bg-white dark:bg-indigo-600 text-slate-900 dark:text-white shadow-sm ring-1 ring-slate-200/60 dark:ring-indigo-500/40"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
               }`}
               id="time_tracking_portal_tab"
             >
-              <Clock className="w-3.5 h-3.5 text-blue-500" />
-              <span>Time Tracking</span>
+              <Clock className="w-4 h-4 text-indigo-500 dark:text-indigo-200" />
+              <span>Timecard Kiosk</span>
             </button>
             <button
               onClick={() => {
                 setActivePortalTab("devotion");
               }}
-              className={`px-2 sm:px-3 py-1.5 rounded-full text-[11px] sm:text-xs font-semibold uppercase tracking-wider transition-all duration-205 flex items-center gap-1.5 justify-center w-full md:w-auto ${
+              className={`px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200 flex items-center gap-1.5 justify-center w-full md:w-auto cursor-pointer ${
                 activePortalTab === "devotion"
-                  ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50 shadow-sm"
-                  : "text-zinc-550 dark:text-zinc-400 hover:text-zinc-900"
+                  ? "bg-white dark:bg-indigo-600 text-slate-900 dark:text-white shadow-sm ring-1 ring-slate-200/60 dark:ring-indigo-500/40"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
               }`}
             >
-              <BookOpen className="w-3.5 h-3.5 text-amber-500" />
+              <BookOpen className="w-4 h-4 text-amber-500 dark:text-amber-300" />
               <span>Devotion & Prayer</span>
             </button>
             <button
               onClick={() => {
                 setActivePortalTab("bulletins");
               }}
-              className={`px-2 sm:px-3 py-1.5 rounded-full text-[11px] sm:text-xs font-semibold uppercase tracking-wider transition-all duration-205 flex items-center gap-1.5 justify-center w-full md:w-auto relative ${
+              className={`px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200 flex items-center gap-1.5 justify-center w-full md:w-auto relative cursor-pointer ${
                 activePortalTab === "bulletins"
-                  ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50 shadow-sm"
-                  : "text-zinc-550 dark:text-zinc-400 hover:text-zinc-900"
+                  ? "bg-white dark:bg-indigo-600 text-slate-900 dark:text-white shadow-sm ring-1 ring-slate-200/60 dark:ring-indigo-500/40"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
               }`}
             >
-              <Megaphone className="w-3.5 h-3.5 text-blue-500 animate-pulse" />
-              <span>Announcements</span>
+              <Megaphone className="w-4 h-4 text-pink-500 dark:text-pink-300" />
+              <span>Bulletins</span>
               {announcements.length > 0 && (
-                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-black text-white">
+                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-black text-white">
                   {announcements.length}
                 </span>
               )}
@@ -2437,27 +2453,27 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
               onClick={() => {
                 setActivePortalTab("timetracking");
               }}
-              className={`px-2 sm:px-3 py-1.5 rounded-full text-[11px] sm:text-xs font-semibold uppercase tracking-wider transition-all duration-205 flex items-center gap-1.5 justify-center w-full md:w-auto ${
+              className={`px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200 flex items-center gap-1.5 justify-center w-full md:w-auto cursor-pointer ${
                 activePortalTab === "timetracking"
-                  ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50 shadow-sm"
-                  : "text-zinc-550 dark:text-zinc-400 hover:text-zinc-900"
+                  ? "bg-white dark:bg-indigo-600 text-slate-900 dark:text-white shadow-sm ring-1 ring-slate-200/60 dark:ring-indigo-500/40"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
               }`}
               id="time_tracking_portal_tab"
             >
-              <Clock className="w-3.5 h-3.5 text-blue-500" />
-              <span>Time Tracking</span>
+              <Clock className="w-4 h-4 text-indigo-500 dark:text-indigo-200" />
+              <span>Timecard Kiosk</span>
             </button>
             <button
               onClick={() => {
                 setActivePortalTab("devotion");
               }}
-              className={`px-2 sm:px-3 py-1.5 rounded-full text-[11px] sm:text-xs font-semibold uppercase tracking-wider transition-all duration-205 flex items-center gap-1.5 justify-center w-full md:w-auto relative ${
+              className={`px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200 flex items-center gap-1.5 justify-center w-full md:w-auto relative cursor-pointer ${
                 activePortalTab === "devotion"
-                  ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50 shadow-sm"
-                  : "text-zinc-550 dark:text-zinc-400 hover:text-zinc-900"
+                  ? "bg-white dark:bg-indigo-600 text-slate-900 dark:text-white shadow-sm ring-1 ring-slate-200/60 dark:ring-indigo-500/40"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
               }`}
             >
-              <BookOpen className="w-3.5 h-3.5 text-amber-500" />
+              <BookOpen className="w-4 h-4 text-amber-500 dark:text-amber-300" />
               <span>Devotion</span>
               {assignedDevotionNotice && (
                 <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[9px] font-black text-slate-950 animate-pulse">
@@ -2470,42 +2486,42 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
                 setActivePortalTab("submit");
                 setSubmitSuccess(null);
               }}
-              className={`px-2 sm:px-3 py-1.5 rounded-full text-[11px] sm:text-xs font-semibold uppercase tracking-wider transition-all duration-205 flex items-center gap-1.5 justify-center w-full md:w-auto ${
+              className={`px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200 flex items-center gap-1.5 justify-center w-full md:w-auto cursor-pointer ${
                 activePortalTab === "submit"
-                  ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50 shadow-sm"
-                  : "text-zinc-550 dark:text-zinc-400 hover:text-zinc-900"
+                  ? "bg-white dark:bg-indigo-600 text-slate-900 dark:text-white shadow-sm ring-1 ring-slate-200/60 dark:ring-indigo-500/40"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
               }`}
             >
-              <FileText className="w-3.5 h-3.5 text-blue-500" />
-              <span>Request Submission</span>
+              <FileText className="w-4 h-4 text-sky-500 dark:text-sky-300" />
+              <span>Request Leave</span>
             </button>
             <button
               onClick={() => {
                 setActivePortalTab("payslips");
               }}
-              className={`px-2 sm:px-3 py-1.5 rounded-full text-[11px] sm:text-xs font-semibold uppercase tracking-wider transition-all duration-205 flex items-center gap-1.5 justify-center w-full md:w-auto relative ${
+              className={`px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200 flex items-center gap-1.5 justify-center w-full md:w-auto relative cursor-pointer ${
                 activePortalTab === "payslips"
-                  ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50 shadow-sm"
-                  : "text-zinc-550 dark:text-zinc-400 hover:text-zinc-900"
+                  ? "bg-white dark:bg-indigo-600 text-slate-900 dark:text-white shadow-sm ring-1 ring-slate-200/60 dark:ring-indigo-500/40"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
               }`}
             >
-              <CreditCard className="w-3.5 h-3.5 text-blue-500" />
+              <CreditCard className="w-4 h-4 text-emerald-500 dark:text-emerald-300" />
               <span>My Payslips</span>
             </button>
             <button
               onClick={() => {
                 setActivePortalTab("notifications");
               }}
-              className={`px-2 sm:px-3 py-1.5 rounded-full text-[11px] sm:text-xs font-semibold uppercase tracking-wider transition-all duration-205 flex items-center gap-1.5 justify-center w-full md:w-auto relative ${
+              className={`px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200 flex items-center gap-1.5 justify-center w-full md:w-auto relative cursor-pointer ${
                 activePortalTab === "notifications"
-                  ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50 shadow-sm"
-                  : "text-zinc-550 dark:text-zinc-400 hover:text-zinc-900"
+                  ? "bg-white dark:bg-indigo-600 text-slate-900 dark:text-white shadow-sm ring-1 ring-slate-200/60 dark:ring-indigo-500/40"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
               }`}
             >
-              <Bell className="w-3.5 h-3.5 text-indigo-550" />
+              <Bell className="w-4 h-4 text-indigo-500 dark:text-indigo-300" />
               <span>My Alerts</span>
               {employeeNotifications.filter(n => !n.read).length > 0 && (
-                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-indigo-600 text-[9px] font-black text-white animate-bounce">
+                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-black text-white animate-bounce">
                   {employeeNotifications.filter(n => !n.read).length}
                 </span>
               )}
@@ -2514,16 +2530,16 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
               onClick={() => {
                 setActivePortalTab("bulletins");
               }}
-              className={`px-2 sm:px-3 py-1.5 rounded-full text-[11px] sm:text-xs font-semibold uppercase tracking-wider transition-all duration-205 flex items-center gap-1.5 justify-center w-full md:w-auto relative ${
+              className={`px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200 flex items-center gap-1.5 justify-center w-full md:w-auto relative cursor-pointer ${
                 activePortalTab === "bulletins"
-                  ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50 shadow-sm"
-                  : "text-zinc-550 dark:text-zinc-400 hover:text-zinc-900"
+                  ? "bg-white dark:bg-indigo-600 text-slate-900 dark:text-white shadow-sm ring-1 ring-slate-200/60 dark:ring-indigo-500/40"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
               }`}
             >
-              <Megaphone className="w-3.5 h-3.5 text-blue-500 animate-pulse" />
-              <span>Announcements</span>
+              <Megaphone className="w-4 h-4 text-pink-500 dark:text-pink-300" />
+              <span>Bulletins</span>
               {announcements.length > 0 && (
-                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-black text-white">
+                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-black text-white">
                   {announcements.length}
                 </span>
               )}

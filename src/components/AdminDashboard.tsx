@@ -39,7 +39,11 @@ import {
   UserX,
   AlertTriangle,
   Layers,
-  MessageSquare
+  MessageSquare,
+  Activity,
+  Coffee,
+  Radio,
+  Zap
 } from "lucide-react";
 import { 
   BarChart, 
@@ -803,6 +807,14 @@ export default function AdminDashboard({
     return () => clearInterval(timer);
   }, []);
 
+  // Studio floor radar filter state
+  const [studioFloorFilter, setStudioFloorFilter] = useState<"all" | "present" | "break" | "offline">("all");
+
+  const isPhtNightShift = useMemo(() => {
+    const phtHour = (time.getUTCHours() + 8) % 24;
+    return phtHour >= 22 || phtHour < 7;
+  }, [time]);
+
   // Compute stats metrics
   const validEmployees = employees.filter((e) => e && e.fullName);
   const totalEmployees = validEmployees.length;
@@ -1235,186 +1247,461 @@ export default function AdminDashboard({
 
   return (
     <div className="space-y-8 w-full min-w-0">
-      {/* Real-time Clock and Welcome Hero */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-6 bg-zinc-900 border border-zinc-800 rounded-2xl text-white shadow-md gap-4 print:hidden">
-        <div>
-          <span className="px-2.5 py-0.5 bg-indigo-500/25 text-indigo-300 rounded-full font-mono font-semibold text-xs tracking-wider uppercase inline-flex items-center gap-1">
-            <ShieldCheck className="w-3.5 h-3.5 text-indigo-400" /> Active Studio Session
-          </span>
-          <h2 className="text-2xl font-bold mt-2 tracking-tight">Oligarch Media Studio</h2>
-          <p className="text-xs text-zinc-400 mt-1 max-w-sm">Welcome back, Administrator. Real-time logging of payroll schedules and employee check-ins is active.</p>
-        </div>
+      {/* Real-time Studio Command Center Hero Banner */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-indigo-950/70 to-slate-950 border border-indigo-500/25 text-white p-6 md:p-8 shadow-2xl print:hidden">
+        {/* Subtle decorative mesh glows */}
+        <div className="absolute -right-20 -top-20 w-80 h-80 bg-indigo-500/15 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute right-1/3 -bottom-24 w-60 h-60 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
 
-        {/* Real-time Clock widget */}
-        <div className="text-left sm:text-right sm:border-l sm:border-zinc-800 sm:pl-6 w-full sm:w-auto">
-          <p className="text-[10px] uppercase font-mono tracking-widest text-zinc-400">CURRENT SYSTEM CLOCK</p>
-          <p className="text-2xl font-extrabold tracking-tight font-mono text-blue-400 mt-1">{time.toLocaleTimeString()}</p>
-          <p className="text-xs text-zinc-400 font-mono mt-0.5">{time.toLocaleDateString(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</p>
+        <div className="relative z-10 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+          <div className="space-y-3 max-w-xl">
+            {/* Live Studio Status Badges */}
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-semibold tracking-wide bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                <span className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" />
+                <span>Oligarch Studio Engine</span>
+              </span>
+
+              <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-semibold tracking-wide ${
+                isPhtNightShift 
+                  ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" 
+                  : "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+              }`}>
+                <span className={`w-2 h-2 rounded-full ${isPhtNightShift ? "bg-emerald-400 animate-ping" : "bg-amber-400"}`} />
+                <span>{isPhtNightShift ? "Night Shift Active (10:00 PM – 7:00 AM PHT)" : "Day Prep Window • Shift at 10:00 PM"}</span>
+              </span>
+            </div>
+
+            {/* Studio Title */}
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white flex items-center gap-2.5">
+                <span>Oligarch Media Control Center</span>
+              </h1>
+              <p className="text-xs sm:text-sm text-slate-300 mt-1 leading-relaxed">
+                Live operational cockpit for Graphic Design & Creative Operations. Real-time timecards, PHT night-shift audits, and payroll processing.
+              </p>
+            </div>
+
+            {/* Micro Metadata Strip (Zero-Pill Discipline) */}
+            <div className="flex flex-wrap items-center gap-y-1 gap-x-3 text-xs text-slate-400 font-mono pt-1">
+              <span className="text-slate-200 font-semibold">{totalEmployees} Roster Artists</span>
+              <span>·</span>
+              <span className="text-emerald-400 font-semibold">{presentCount} Clocked On Shift</span>
+              <span>·</span>
+              <span className="text-indigo-300">Spark Firebase Active</span>
+              {totalPendingHRTasks > 0 && (
+                <>
+                  <span>·</span>
+                  <span className="text-amber-400 font-bold">{totalPendingHRTasks} Tasks Pending</span>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Real-time Manila Digital Clock & Quick Actions */}
+          <div className="flex flex-col sm:flex-row lg:flex-col items-start lg:items-end justify-between gap-4 w-full lg:w-auto pt-4 lg:pt-0 border-t border-white/10 lg:border-t-0">
+            <div className="text-left lg:text-right">
+              <div className="text-[10px] font-mono font-bold uppercase tracking-widest text-slate-400">
+                MANILA TIME (PHT, UTC+8)
+              </div>
+              <div className="text-3xl sm:text-4xl font-black font-mono tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-indigo-300 via-sky-200 to-emerald-300 tabular-nums mt-0.5">
+                {time.toLocaleTimeString()}
+              </div>
+              <div className="text-xs text-slate-300 font-mono mt-0.5">
+                {time.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric", year: "numeric" })}
+              </div>
+            </div>
+
+            {/* Hero Quick Actions */}
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+              {totalPendingHRTasks > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setActiveSubTab("pending_tasks")}
+                  className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-mono font-black flex items-center gap-1.5 transition-all shadow-md cursor-pointer"
+                >
+                  <Inbox className="w-3.5 h-3.5" />
+                  <span>Review Tasks ({totalPendingHRTasks})</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={handlePrint}
+                className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-mono font-bold flex items-center gap-1.5 transition-all border border-white/10 cursor-pointer"
+                title="Print Dashboard Summary"
+              >
+                <Printer className="w-3.5 h-3.5 text-slate-300" />
+                <span className="hidden sm:inline">Print Report</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Sub-tab Switcher Segmented Control */}
-      <div className="flex overflow-x-auto whitespace-nowrap [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden border-b border-zinc-200 dark:border-zinc-800 gap-2 print:hidden pb-px">
+      {/* Sub-tab Switcher - Modern Segmented Pill Track */}
+      <div className="p-1.5 bg-slate-100 dark:bg-slate-900/90 rounded-2xl border border-slate-200/80 dark:border-white/10 flex overflow-x-auto whitespace-nowrap [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden gap-1.5 print:hidden">
         <button
           onClick={() => setActiveSubTab("overview")}
-          className={`shrink-0 px-4 py-2 text-xs font-bold font-mono uppercase tracking-wider border-b-2 transition-all flex items-center gap-2 ${
+          className={`shrink-0 px-4 py-2.5 rounded-xl text-xs font-bold font-mono tracking-wider transition-all flex items-center gap-2 cursor-pointer ${
             activeSubTab === "overview"
-              ? "border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400 animate-pulse"
-              : "border-transparent text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300"
+              ? "bg-white dark:bg-indigo-600 text-slate-900 dark:text-white shadow-sm ring-1 ring-slate-200/60 dark:ring-indigo-500/40"
+              : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-white/5"
           }`}
           id="overview_tab"
         >
-          <BarChart4 className="w-4 h-4" /> Studio Analytics Overview
+          <BarChart4 className="w-4 h-4 text-indigo-500 dark:text-indigo-200" />
+          <span>Studio Analytics & Floor</span>
         </button>
         <button
           onClick={() => setActiveSubTab("pending_tasks")}
-          className={`shrink-0 px-4 py-2 text-xs font-bold font-mono uppercase tracking-wider border-b-2 transition-all flex items-center gap-2 ${
+          className={`shrink-0 px-4 py-2.5 rounded-xl text-xs font-bold font-mono tracking-wider transition-all flex items-center gap-2 cursor-pointer ${
             activeSubTab === "pending_tasks"
-              ? "border-amber-500 text-amber-500 dark:text-amber-400 dark:border-amber-400"
-              : "border-transparent text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300"
+              ? "bg-white dark:bg-amber-500 text-slate-900 dark:text-slate-950 shadow-sm ring-1 ring-slate-200/60 dark:ring-amber-400/40"
+              : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-white/5"
           }`}
           id="pending_tasks_tab"
         >
-          <Inbox className="w-4 h-4 text-amber-500" /> Pending HR Tasks & Approvals
+          <Inbox className="w-4 h-4 text-amber-500" />
+          <span>Pending HR Tasks & Approvals</span>
           {totalPendingHRTasks > 0 && (
-            <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-amber-500 text-slate-950 shadow-xs">
+            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-amber-500 text-slate-950 dark:bg-slate-950 dark:text-amber-400 shadow-xs">
               {totalPendingHRTasks}
             </span>
           )}
         </button>
         <button
           onClick={() => setActiveSubTab("overtime")}
-          className={`shrink-0 px-4 py-2 text-xs font-bold font-mono uppercase tracking-wider border-b-2 transition-all flex items-center gap-2 ${
+          className={`shrink-0 px-4 py-2.5 rounded-xl text-xs font-bold font-mono tracking-wider transition-all flex items-center gap-2 cursor-pointer ${
             activeSubTab === "overtime"
-              ? "border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400"
-              : "border-transparent text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300"
+              ? "bg-white dark:bg-indigo-600 text-slate-900 dark:text-white shadow-sm ring-1 ring-slate-200/60 dark:ring-indigo-500/40"
+              : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-white/5"
           }`}
           id="overtime_tab"
         >
-          <Clock className="w-4 h-4" /> Overtime Audit & Payroll Export
+          <Clock className="w-4 h-4 text-sky-500 dark:text-sky-300" />
+          <span>Overtime Audit & Payroll Export</span>
         </button>
         <button
           onClick={() => setActiveSubTab("announcements")}
-          className={`shrink-0 px-4 py-2 text-xs font-bold font-mono uppercase tracking-wider border-b-2 transition-all flex items-center gap-2 ${
+          className={`shrink-0 px-4 py-2.5 rounded-xl text-xs font-bold font-mono tracking-wider transition-all flex items-center gap-2 cursor-pointer ${
             activeSubTab === "announcements"
-              ? "border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400"
-              : "border-transparent text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300"
+              ? "bg-white dark:bg-indigo-600 text-slate-900 dark:text-white shadow-sm ring-1 ring-slate-200/60 dark:ring-indigo-500/40"
+              : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-white/5"
           }`}
           id="announcements_tab"
         >
-          <Megaphone className="w-4 h-4" /> Company Announcements
+          <Megaphone className="w-4 h-4 text-pink-500 dark:text-pink-300" />
+          <span>Company Announcements</span>
         </button>
       </div>
 
       {activeSubTab === "overview" && (
         <>
-          {/* Dedicated Mobile HR Quick-Action Banner */}
-          <div className="p-4 bg-gradient-to-r from-amber-500/15 via-zinc-900 to-zinc-900 border border-amber-500/30 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm print:hidden">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0">
-                <Smartphone className="w-5 h-5" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-mono font-black uppercase text-amber-400 tracking-wider">
-                    📱 MOBILE HR ACTION HUB
-                  </span>
-                  {totalPendingHRTasks > 0 ? (
-                    <span className="px-1.5 py-0.2 text-[9px] font-black font-mono rounded bg-amber-500 text-slate-950 uppercase">
-                      {totalPendingHRTasks} Awaiting Review
-                    </span>
-                  ) : (
-                    <span className="px-1.5 py-0.2 text-[9px] font-mono rounded bg-emerald-500/20 text-emerald-400 font-bold uppercase">
-                      All Caught Up
-                    </span>
-                  )}
+          {/* Dedicated Mobile Quick-Action Banner */}
+          {totalPendingHRTasks > 0 && (
+            <div className="p-4 bg-gradient-to-r from-amber-500/15 via-slate-900 to-slate-900 border border-amber-500/30 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-md print:hidden">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0">
+                  <Smartphone className="w-5 h-5" />
                 </div>
-                <p className="text-xs font-bold text-white mt-0.5">
-                  {totalPendingHRTasks > 0
-                    ? `${pendingLeaves.length} leave approval${pendingLeaves.length !== 1 ? "s" : ""} & ${pendingAttendanceCopies.length} attendance voucher${pendingAttendanceCopies.length !== 1 ? "s" : ""} need approval.`
-                    : "No pending leave approvals or attendance copy vouchers right now."}
-                </p>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-mono font-black uppercase text-amber-400 tracking-wider">
+                      MOBILE APPROVAL DESK
+                    </span>
+                    <span className="px-1.5 py-0.2 text-[9px] font-black font-mono rounded bg-amber-500 text-slate-950 uppercase">
+                      {totalPendingHRTasks} Pending
+                    </span>
+                  </div>
+                  <p className="text-xs font-bold text-white mt-0.5">
+                    {pendingLeaves.length} leave request{pendingLeaves.length !== 1 ? "s" : ""} & {pendingAttendanceCopies.length} attendance voucher{pendingAttendanceCopies.length !== 1 ? "s" : ""} awaiting your signature.
+                  </p>
+                </div>
               </div>
+
+              <button
+                type="button"
+                onClick={() => setActiveSubTab("pending_tasks")}
+                className="w-full sm:w-auto px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-mono font-black transition-all shadow-md flex items-center justify-center gap-1.5 shrink-0 cursor-pointer"
+              >
+                <span>Open Review Desk</span>
+                <ChevronRight className="w-4 h-4" />
+              </button>
             </div>
+          )}
 
-            <button
-              type="button"
-              onClick={() => setActiveSubTab("pending_tasks")}
-              className="w-full sm:w-auto px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-mono font-black transition-all shadow-md flex items-center justify-center gap-1.5 shrink-0 cursor-pointer"
-            >
-              <span>Review on Mobile View</span>
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* KPI Cards section */}
-          <section className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {/* Total employees */}
-            <div className="p-4 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl flex flex-col justify-between shadow-sm">
+          {/* High-Impact Modern KPI Cards Grid */}
+          <section className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3.5 sm:gap-4">
+            {/* Total Staff */}
+            <div className="p-4 sm:p-5 bg-white dark:bg-slate-900/90 border border-slate-200/90 dark:border-white/10 rounded-2xl flex flex-col justify-between shadow-xs hover:shadow-md transition-shadow">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-zinc-500 font-mono uppercase">Total Staff</span>
-                <Users className="w-5 h-5 text-zinc-400" />
+                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 font-mono uppercase tracking-wider">Total Staff</span>
+                <div className="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-500/15 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                  <Users className="w-4 h-4" />
+                </div>
               </div>
-              <div className="mt-4">
-                <p className="text-2xl font-bold text-zinc-900 dark:text-white">{totalEmployees}</p>
-                <p className="text-[10px] text-green-600 mt-1 font-mono font-bold">● {activeEmployees.length} ACTIVE</p>
+              <div className="mt-3">
+                <p className="text-3xl font-extrabold text-slate-900 dark:text-white tabular-nums tracking-tight">{totalEmployees}</p>
+                <div className="mt-2 flex items-center gap-1.5 text-[11px] text-emerald-600 dark:text-emerald-400 font-mono font-bold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  <span>{activeEmployees.length} Active Artists</span>
+                </div>
               </div>
             </div>
 
             {/* Present Today */}
-            <div className="p-4 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl flex flex-col justify-between shadow-sm">
+            <div className="p-4 sm:p-5 bg-white dark:bg-slate-900/90 border border-slate-200/90 dark:border-white/10 rounded-2xl flex flex-col justify-between shadow-xs hover:shadow-md transition-shadow">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-zinc-500 font-mono uppercase">Present</span>
-                <CheckCircle className="w-5 h-5 text-green-500" />
+                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 font-mono uppercase tracking-wider">On Shift</span>
+                <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-500/15 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                  <CheckCircle className="w-4 h-4" />
+                </div>
               </div>
-              <div className="mt-4">
-                <p className="text-2xl font-bold text-zinc-900 dark:text-white">{presentCount}</p>
-                <p className="text-[10px] text-zinc-500 mt-1 font-mono">
-                  {onBreakCount > 0 ? `${onBreakCount} on break | ` : ""}{lateCount} late today
-                </p>
+              <div className="mt-3">
+                <p className="text-3xl font-extrabold text-slate-900 dark:text-white tabular-nums tracking-tight">{presentCount}</p>
+                <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                  {onBreakCount > 0 ? `${onBreakCount} on break · ` : ""}{lateCount} late today
+                </div>
               </div>
             </div>
 
             {/* Absent Today */}
-            <div className="p-4 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl flex flex-col justify-between shadow-sm">
+            <div className="p-4 sm:p-5 bg-white dark:bg-slate-900/90 border border-slate-200/90 dark:border-white/10 rounded-2xl flex flex-col justify-between shadow-xs hover:shadow-md transition-shadow">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-zinc-500 font-mono uppercase">Absent</span>
-                <AlertCircle className="w-5 h-5 text-red-500" />
+                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 font-mono uppercase tracking-wider">Offline / Off</span>
+                <div className="w-8 h-8 rounded-xl bg-rose-50 dark:bg-rose-500/15 flex items-center justify-center text-rose-600 dark:text-rose-400">
+                  <AlertCircle className="w-4 h-4" />
+                </div>
               </div>
-              <div className="mt-4">
-                <p className="text-2xl font-bold text-zinc-900 dark:text-white">{absentCount}</p>
-                <p className="text-[10px] text-zinc-500 mt-1 font-mono">
-                  {unloggedCount > 0 ? `${unloggedCount} offline/yet to sign-in` : "All active staff logged"}
-                </p>
+              <div className="mt-3">
+                <p className="text-3xl font-extrabold text-slate-900 dark:text-white tabular-nums tracking-tight">{absentCount}</p>
+                <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                  {unloggedCount > 0 ? `${unloggedCount} not signed in` : "All logged in"}
+                </div>
               </div>
             </div>
 
             {/* Pending Requests */}
             <div 
-              className="p-4 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl flex flex-col justify-between shadow-sm cursor-pointer hover:border-yellow-300 dark:hover:border-zinc-750 transition-colors" 
+              className="p-4 sm:p-5 bg-white dark:bg-slate-900/90 border border-slate-200/90 dark:border-white/10 rounded-2xl flex flex-col justify-between shadow-xs hover:shadow-md hover:border-amber-400/50 dark:hover:border-amber-400/40 transition-all cursor-pointer group" 
               onClick={() => setActiveSubTab("pending_tasks")}
               id="pending_requests_card"
             >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-zinc-500 font-mono uppercase">Requests</span>
-                <TrendingUp className="w-5 h-5 text-yellow-500" />
+                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 font-mono uppercase tracking-wider">Pending HR</span>
+                <div className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-500/15 flex items-center justify-center text-amber-600 dark:text-amber-400 group-hover:scale-105 transition-transform">
+                  <TrendingUp className="w-4 h-4" />
+                </div>
               </div>
-              <div className="mt-4">
-                <p className="text-2xl font-bold text-zinc-900 dark:text-white">{pendingRequestsCount}</p>
-                <p className="text-[10px] text-yellow-600 font-bold font-mono mt-1">▲ PENDING REVIEW</p>
+              <div className="mt-3">
+                <p className="text-3xl font-extrabold text-slate-900 dark:text-white tabular-nums tracking-tight">{pendingRequestsCount}</p>
+                <div className="mt-2 flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-400 font-mono font-bold">
+                  <span>Requires Action</span>
+                  <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+                </div>
               </div>
             </div>
 
             {/* Upcoming Birthdays count */}
-            <div className="p-4 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl flex flex-col justify-between shadow-sm md:col-span-4 lg:col-span-1">
+            <div className="p-4 sm:p-5 bg-white dark:bg-slate-900/90 border border-slate-200/90 dark:border-white/10 rounded-2xl flex flex-col justify-between shadow-xs hover:shadow-md transition-shadow col-span-2 sm:col-span-1 md:col-span-4 lg:col-span-1">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-zinc-500 font-mono uppercase">Birthdays</span>
-                <Heart className="w-5 h-5 text-pink-500" />
+                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 font-mono uppercase tracking-wider">Birthdays</span>
+                <div className="w-8 h-8 rounded-xl bg-pink-50 dark:bg-pink-500/15 flex items-center justify-center text-pink-600 dark:text-pink-400">
+                  <Heart className="w-4 h-4" />
+                </div>
               </div>
-              <div className="mt-4">
-                <p className="text-2xl font-bold text-zinc-900 dark:text-white">{upcomingBirthdays.length}</p>
-                <p className="text-[10px] text-zinc-500 mt-1 font-mono">This month ({(time instanceof Date && !isNaN(time.getTime()) ? time : new Date()).toLocaleString(undefined, { month: "short" })})</p>
+              <div className="mt-3">
+                <p className="text-3xl font-extrabold text-slate-900 dark:text-white tabular-nums tracking-tight">{upcomingBirthdays.length}</p>
+                <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                  {(time instanceof Date && !isNaN(time.getTime()) ? time : new Date()).toLocaleString(undefined, { month: "long" })} Celebrations
+                </div>
               </div>
+            </div>
+          </section>
+
+          {/* ============================================================== */}
+          {/* LIVE STUDIO FLOOR & ATTENDANCE RADAR (ALL 11 DESIGN ARTISTS)   */}
+          {/* ============================================================== */}
+          <section className="p-5 sm:p-6 bg-white dark:bg-slate-900/90 border border-slate-200/90 dark:border-white/10 rounded-3xl shadow-sm space-y-5">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <h3 className="font-extrabold text-base text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+                    <span>Live Studio Floor & Staff Attendance</span>
+                  </h3>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  Real-time status of all 11 official studio team members for today's night shift.
+                </p>
+              </div>
+
+              {/* Studio floor quick filters */}
+              <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-950/80 rounded-xl border border-slate-200/80 dark:border-white/10 text-xs font-mono font-bold">
+                <button
+                  type="button"
+                  onClick={() => setStudioFloorFilter("all")}
+                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                    studioFloorFilter === "all"
+                      ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs"
+                      : "text-slate-500 hover:text-slate-900 dark:hover:text-slate-300"
+                  }`}
+                >
+                  All ({activeEmployees.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStudioFloorFilter("present")}
+                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                    studioFloorFilter === "present"
+                      ? "bg-emerald-500 text-white shadow-xs"
+                      : "text-slate-500 hover:text-emerald-500"
+                  }`}
+                >
+                  On Shift ({presentCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStudioFloorFilter("break")}
+                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                    studioFloorFilter === "break"
+                      ? "bg-amber-500 text-slate-950 shadow-xs"
+                      : "text-slate-500 hover:text-amber-500"
+                  }`}
+                >
+                  Break ({onBreakCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStudioFloorFilter("offline")}
+                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                    studioFloorFilter === "offline"
+                      ? "bg-slate-700 text-white shadow-xs"
+                      : "text-slate-500 hover:text-slate-900 dark:hover:text-slate-300"
+                  }`}
+                >
+                  Not In ({unloggedCount})
+                </button>
+              </div>
+            </div>
+
+            {/* 11 Studio Team Cards Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+              {activeEmployees
+                .filter((emp) => {
+                  const log = todayLogs.find((l) => l.employeeId === emp.id || l.employeeNumber === emp.employeeNumber);
+                  const isPresent = log && (log.status === "Present" || log.status === "On Break" || log.status === "Late" || log.status === "Timed Out" || (log.timeIn && !log.timeOut));
+                  const isOnBreak = log && log.status === "On Break";
+                  if (studioFloorFilter === "present") return isPresent && !isOnBreak;
+                  if (studioFloorFilter === "break") return isOnBreak;
+                  if (studioFloorFilter === "offline") return !isPresent;
+                  return true;
+                })
+                .map((emp) => {
+                  const log = todayLogs.find((l) => l.employeeId === emp.id || l.employeeNumber === emp.employeeNumber);
+                  const isPresent = log && (log.status === "Present" || log.status === "On Break" || log.status === "Late" || log.status === "Timed Out" || (log.timeIn && !log.timeOut));
+                  const isOnBreak = log && log.status === "On Break";
+                  const isLate = log && isAttendanceLate(log);
+                  const isTimedOut = log && Boolean(log.timeOut);
+
+                  // Check if on approved leave
+                  const approvedLeave = requests.find(r => 
+                    (r.employeeNumber === emp.employeeNumber || r.employeeId === emp.id) &&
+                    r.status === "Approved" &&
+                    r.startDate <= todayStr &&
+                    r.endDate >= todayStr
+                  );
+
+                  return (
+                    <div
+                      key={emp.id || emp.employeeNumber}
+                      className="p-3.5 rounded-2xl bg-slate-50/70 dark:bg-slate-950/60 border border-slate-200/80 dark:border-white/5 hover:border-indigo-400/40 transition-all flex flex-col justify-between gap-3 group"
+                    >
+                      <div className="flex items-start justify-between gap-2.5">
+                        <div className="flex items-center gap-3 min-w-0">
+                          {/* Avatar with status indicator ring */}
+                          <div className="relative shrink-0">
+                            <img
+                              src={emp.profilePicture || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=120"}
+                              alt={emp.fullName}
+                              referrerPolicy="no-referrer"
+                              className={`w-10 h-10 rounded-full object-cover ring-2 ${
+                                isOnBreak
+                                  ? "ring-amber-400"
+                                  : isPresent
+                                  ? "ring-emerald-400"
+                                  : approvedLeave
+                                  ? "ring-purple-400"
+                                  : "ring-slate-300 dark:ring-slate-700"
+                              }`}
+                            />
+                            <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white dark:border-slate-900 ${
+                              isOnBreak
+                                ? "bg-amber-400"
+                                : isPresent
+                                ? "bg-emerald-500 animate-pulse"
+                                : approvedLeave
+                                ? "bg-purple-500"
+                                : "bg-slate-400"
+                            }`} />
+                          </div>
+
+                          <div className="min-w-0">
+                            <h4 className="font-bold text-xs text-slate-900 dark:text-white truncate group-hover:text-indigo-500 transition-colors">
+                              {emp.fullName}
+                            </h4>
+                            <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate mt-0.5">
+                              #{emp.employeeNumber} · {emp.position || "Designer"}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Status indicator row */}
+                      <div className="pt-2 border-t border-slate-200/60 dark:border-white/5 flex items-center justify-between text-[11px] font-mono">
+                        <div className="text-slate-500 dark:text-slate-400 truncate">
+                          {log?.timeIn ? (
+                            <span>In: <strong className="text-slate-800 dark:text-slate-200">{formatTo12Hour(log.timeIn)}</strong></span>
+                          ) : (
+                            <span className="text-slate-400">Shift: 10PM–7AM</span>
+                          )}
+                        </div>
+
+                        <div>
+                          {isOnBreak ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25">
+                              <Coffee className="w-3 h-3" />
+                              <span>On Break</span>
+                            </span>
+                          ) : isTimedOut ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/15 text-sky-600 dark:text-sky-400 border border-sky-500/25">
+                              <Check className="w-3 h-3" />
+                              <span>Shift Done</span>
+                            </span>
+                          ) : isPresent ? (
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              isLate 
+                                ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25" 
+                                : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25"
+                            }`}>
+                              <Activity className="w-3 h-3" />
+                              <span>{isLate ? "Clocked Late" : "On Shift"}</span>
+                            </span>
+                          ) : approvedLeave ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/25">
+                              <CalendarDays className="w-3 h-3" />
+                              <span>On Leave</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-200/60 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                              <span>Not In Yet</span>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
             </div>
           </section>
 

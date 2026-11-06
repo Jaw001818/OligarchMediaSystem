@@ -75,7 +75,11 @@ import {
   Settings,
   LogOut,
   BookOpen,
-  Trash2
+  Trash2,
+  Sun,
+  Moon,
+  Sparkles,
+  X
 } from "lucide-react";
 
 export default function App() {
@@ -628,11 +632,11 @@ export default function App() {
             <div className="flex-1 flex items-center justify-center p-4 overflow-y-auto">
               <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-805 w-full max-w-sm rounded-2xl overflow-hidden shadow-xl p-6 relative">
                 <div className="text-center mb-6">
-                  <div className="w-12 h-12 rounded-xl bg-blue-600 flex items-center justify-center text-white font-extrabold text-xl mx-auto mb-3 shadow-md">
-                    N
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-sky-400 flex items-center justify-center text-white font-black text-xl mx-auto mb-3 shadow-lg ring-4 ring-indigo-500/20">
+                    OM
                   </div>
-                  <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-50 tracking-tight">Admin Authentication</h3>
-                  <p className="text-[11px] text-zinc-400 mt-1 max-w-[200px] mx-auto">Access HR calculations directory files.</p>
+                  <h3 className="text-lg font-extrabold text-zinc-900 dark:text-zinc-50 tracking-tight">Oligarch Media Control Panel</h3>
+                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 max-w-[240px] mx-auto font-mono">HR Calculations, Attendance & Studio Operations</p>
                 </div>
 
                 {authError && (
@@ -756,36 +760,59 @@ export default function App() {
               {/* Main Content Workspace viewport */}
               <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-y-auto overflow-x-hidden">
                 
-                {/* Mobile Hamburger Title Rail */}
-                <header className="p-4 bg-white dark:bg-zinc-950 border-b border-zinc-200 dark:border-zinc-800 flex md:hidden justify-between items-center">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center text-white font-black text-sm">OM</div>
-                    <span className="font-bold text-sm text-zinc-900 dark:text-zinc-50">Oligarch Media Control Panel</span>
+                {/* Modern Mobile Top App Bar */}
+                <header className="px-4 py-3 bg-white/95 dark:bg-slate-950/95 backdrop-blur-md border-b border-slate-200/80 dark:border-white/10 flex md:hidden justify-between items-center sticky top-0 z-30 shrink-0">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-sky-400 flex items-center justify-center text-white font-black text-xs shadow-md ring-2 ring-indigo-500/20">
+                      OM
+                    </div>
+                    <div>
+                      <span className="font-extrabold text-sm text-slate-900 dark:text-white tracking-tight block leading-tight">Oligarch Media</span>
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono block leading-tight">Studio Control Center</span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
+
+                  <div className="flex items-center gap-1.5">
+                    <button 
+                      onClick={() => setThemeMode(themeMode === "dark" ? "light" : "dark")}
+                      className="w-9 h-9 rounded-xl border border-slate-200 dark:border-white/10 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
+                      title="Toggle Theme"
+                      aria-label="Toggle Theme"
+                    >
+                      {themeMode === "dark" ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-indigo-500" />}
+                    </button>
+
                     <button 
                       onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
-                      className="p-1 px-2 border border-zinc-200 dark:border-zinc-800 rounded-lg text-zinc-650"
+                      className="px-2.5 py-1.5 border border-slate-200 dark:border-white/10 rounded-xl text-slate-700 dark:text-slate-300 text-xs font-mono font-bold flex items-center gap-1.5 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                      aria-label="Menu"
                     >
-                      <Menu className="w-5 h-5" />
+                      {mobileSidebarOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+                      <span className="text-[11px]">Menu</span>
+                      {pendingRequestsCount > 0 && (
+                        <span className="w-2 h-2 rounded-full bg-amber-500" />
+                      )}
                     </button>
                   </div>
                 </header>
 
                 {/* Mobile dropdown menu drawers */}
                 {mobileSidebarOpen && (
-                  <div className="bg-white dark:bg-zinc-950 border-b border-zinc-200 dark:border-zinc-800 md:hidden p-4 space-y-1 animate-in slide-in-from-top-3 z-40">
+                  <div className="bg-white dark:bg-slate-950 border-b border-slate-200 dark:border-white/10 md:hidden p-4 space-y-1 animate-in slide-in-from-top-3 z-40 shadow-xl">
+                    <div className="px-3 py-1 text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400">
+                      Studio Operations Navigation
+                    </div>
                     {[
-                      { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-                      { id: "devotion", label: "Devotion & Prayer", icon: BookOpen },
-                      { id: "employees", label: "Employees", icon: Users },
-                      { id: "attendance", label: "Attendance Tracker", icon: CalendarDays },
-                      { id: "attendance-override", label: "Attendance Editor", icon: Sliders },
-                      { id: "payroll", label: "Payroll Hub", icon: CreditCard },
-                      { id: "cash-advances", label: "Advances & Boss Credits", icon: CreditCard },
-                      { id: "requests", label: "Employee Requests", icon: MailWarning, count: pendingRequestsCount },
+                      { id: "dashboard", label: "Dashboard Overview", icon: LayoutDashboard },
+                      { id: "devotion", label: "Devotion & Prayer Desk", icon: BookOpen },
+                      { id: "employees", label: "Staff & Artists Directory", icon: Users },
+                      { id: "attendance", label: "Live Attendance Tracker", icon: CalendarDays },
+                      { id: "attendance-override", label: "Attendance Timecard Editor", icon: Sliders },
+                      { id: "payroll", label: "Payroll Processing Hub", icon: CreditCard },
+                      { id: "cash-advances", label: "Cash Advances & Boss Debts", icon: CreditCard },
+                      { id: "requests", label: "Employee Leave & Voucher Requests", icon: MailWarning, count: pendingRequestsCount },
                       { id: "trash", label: "Recycle Bin", icon: Trash2 },
-                      { id: "settings", label: "System Config", icon: Settings },
+                      { id: "settings", label: "Studio System Config", icon: Settings },
                     ].map((item) => {
                       const IconComponent = item.icon;
                       const isActive = currentTab === item.id;
@@ -796,10 +823,10 @@ export default function App() {
                             setCurrentTab(item.id);
                             setMobileSidebarOpen(false);
                           }}
-                          className={`w-full text-left font-bold px-3 py-2.5 text-xs rounded-lg flex items-center justify-between transition-all ${
+                          className={`w-full text-left font-bold px-3 py-2.5 text-xs rounded-xl flex items-center justify-between transition-all cursor-pointer ${
                             isActive 
-                              ? "bg-indigo-600 text-white dark:bg-indigo-500/20 dark:text-indigo-400 font-extrabold border-l-2 border-l-indigo-500" 
-                              : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900/50"
+                              ? "bg-indigo-600 text-white shadow-sm font-extrabold" 
+                              : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5"
                           }`}
                         >
                           <div className="flex items-center gap-2.5">
@@ -807,40 +834,40 @@ export default function App() {
                             <span>{item.label}</span>
                           </div>
                           {item.count !== undefined && item.count > 0 && (
-                            <span className="bg-sky-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] h-[18px] flex items-center justify-center leading-none">
+                            <span className="bg-amber-500 text-slate-950 text-[10px] font-black font-mono px-1.5 py-0.5 rounded-full min-w-[18px] h-[18px] flex items-center justify-center leading-none">
                               {item.count}
                             </span>
                           )}
                         </button>
                       );
                     })}
-                    <div className="border-t border-zinc-100 dark:border-zinc-900 my-2 pt-2 space-y-1">
+                    <div className="border-t border-slate-200 dark:border-white/10 my-2 pt-2 space-y-1">
                       <button
                         onClick={() => {
                           setPortalMode(true);
                           setMobileSidebarOpen(false);
                         }}
-                        className="w-full text-left font-bold text-blue-600 dark:text-blue-400 px-3 py-2 text-xs rounded-lg flex items-center gap-2.5 hover:bg-blue-50/50 dark:hover:bg-blue-500/10 transition-all"
+                        className="w-full text-left font-bold text-indigo-600 dark:text-indigo-400 px-3 py-2 text-xs rounded-xl flex items-center gap-2.5 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-all cursor-pointer"
                       >
                         <Smartphone className="w-4 h-4 shrink-0" /> 
-                        <span>Employee Portal Mode</span>
+                        <span>Switch to Employee Kiosk Mode</span>
                       </button>
                       <button
                         onClick={() => {
                           handleLogout();
                           setMobileSidebarOpen(false);
                         }}
-                        className="w-full text-left font-bold text-red-500 px-3 py-2 text-xs rounded-lg flex items-center gap-2.5 hover:bg-red-50/50 dark:hover:bg-red-500/10 transition-all"
+                        className="w-full text-left font-bold text-rose-600 dark:text-rose-400 px-3 py-2 text-xs rounded-xl flex items-center gap-2.5 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-all cursor-pointer"
                       >
                         <LogOut className="w-4 h-4 shrink-0" />
-                        <span>Logout Session</span>
+                        <span>Sign Out of Console</span>
                       </button>
                     </div>
                   </div>
                 )}
 
                 {/* Dynamic Content Rendering switcher */}
-                <main className="p-4 sm:p-6 md:p-8 flex-1 min-w-0 w-full max-w-full">
+                <main className="p-4 sm:p-6 md:p-8 pb-28 md:pb-8 flex-1 min-w-0 w-full max-w-full">
                   {currentTab === "dashboard" && (
                     <AdminDashboard 
                       employees={employees} 
@@ -948,6 +975,52 @@ export default function App() {
                     />
                   )}
                 </main>
+
+                {/* Fixed Mobile Bottom Navigation Bar (Thumb-Zone Priority) */}
+                <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-[#0A0D16]/95 backdrop-blur-xl border-t border-slate-200/90 dark:border-white/10 px-2 py-1 shadow-2xl flex items-center justify-around print:hidden">
+                  {[
+                    { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+                    { id: "employees", label: "Staff", icon: Users },
+                    { id: "attendance", label: "Attendance", icon: CalendarDays },
+                    { id: "payroll", label: "Payroll", icon: CreditCard },
+                    { id: "more", label: "Menu", icon: Menu, count: pendingRequestsCount }
+                  ].map((tab) => {
+                    const Icon = tab.icon;
+                    const isActive = tab.id === "more" ? mobileSidebarOpen : currentTab === tab.id;
+                    return (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => {
+                          if (tab.id === "more") {
+                            setMobileSidebarOpen(!mobileSidebarOpen);
+                          } else {
+                            setCurrentTab(tab.id);
+                            setMobileSidebarOpen(false);
+                          }
+                        }}
+                        className={`flex-1 flex flex-col items-center justify-center py-1.5 px-1 rounded-2xl transition-all relative min-h-[50px] cursor-pointer ${
+                          isActive
+                            ? "text-indigo-600 dark:text-indigo-400 font-bold"
+                            : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 font-medium"
+                        }`}
+                      >
+                        <div className={`p-1 rounded-xl transition-colors ${isActive ? "bg-indigo-50 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400" : ""}`}>
+                          <Icon className="w-5 h-5" />
+                        </div>
+                        <span className="text-[10px] tracking-tight mt-0.5 font-sans leading-none">{tab.label}</span>
+                        {tab.count !== undefined && tab.count > 0 && (
+                          <span className="absolute top-1 right-2 px-1 py-0.2 rounded-full bg-amber-500 text-slate-950 font-mono font-black text-[9px] min-w-[15px] text-center leading-none">
+                            {tab.count}
+                          </span>
+                        )}
+                        {isActive && (
+                          <span className="w-1 h-1 rounded-full bg-indigo-600 dark:bg-indigo-400 mt-0.5" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </nav>
               </div>
 
             </div>
