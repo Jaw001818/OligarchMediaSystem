@@ -5,6 +5,9 @@ build/
 coverage/
 .aistudio/
 /data/
+data/*.json
+persistent_db*.json
+*.json.bak
 !src/data/
 !src/data/**
 .DS_Store
