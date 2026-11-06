@@ -656,10 +656,11 @@ async function pullAllFromFirestore() {
   }
 }
 
-// Published container peer URL for real-time mesh sync between editing and published apps
-const PUBLISHED_APP_URL = process.env.PUBLISHED_APP_URL || "https://oligarchmediamanagement.ai.studio";
+// Published container peer URL (optional, only enabled when explicitly configured)
+const PUBLISHED_APP_URL = process.env.PUBLISHED_APP_URL || "";
 
 async function syncWithPublishedApp() {
+  if (!PUBLISHED_APP_URL) return;
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 6000);

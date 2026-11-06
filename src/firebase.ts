@@ -315,8 +315,28 @@ function ensureSseConnection() {
         if (payload && payload.collection) {
           const col = payload.collection;
           fetchServerCollection(col).then((updatedItems) => {
-            if (updatedItems) {
-              inMemoryCache[col] = updatedItems;
+            if (updatedItems && Array.isArray(updatedItems)) {
+              const currentList = inMemoryCache[col] || [];
+              const itemMap = new Map<string, any>();
+              currentList.forEach((it: any) => {
+                const k = it.id || it.date;
+                if (k) itemMap.set(k, it);
+              });
+              updatedItems.forEach((it: any) => {
+                const k = it.id || it.date;
+                if (!k) return;
+                const existing = itemMap.get(k);
+                if (!existing) {
+                  itemMap.set(k, it);
+                } else {
+                  const existingTime = Number(existing.updatedAt || existing.timestamp || 0);
+                  const incomingTime = Number(it.updatedAt || it.timestamp || 0);
+                  if (incomingTime >= existingTime) {
+                    itemMap.set(k, { ...existing, ...it });
+                  }
+                }
+              });
+              inMemoryCache[col] = Array.from(itemMap.values());
               const subs = sseCollectionSubscribers.get(col);
               if (subs) subs.forEach((cb) => cb());
             }
