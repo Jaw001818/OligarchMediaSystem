@@ -1,5 +1,5 @@
 import { Employee, Attendance, DayOfWeek, DaySchedule, WeeklySchedule, ScheduleOverride, EffectiveSchedule, SalaryRateRecord } from "./types";
-import { OFFICIAL_JOEMARIE_PANGAN, OFFICIAL_STAFF_ROSTER } from "./officialStaffBackup";
+import { OFFICIAL_JOEMARIE_PANGAN, OFFICIAL_STAFF_ROSTER } from "@/officialStaffBackup";
 
 export const generateMockEmployees = (): Employee[] => {
   return OFFICIAL_STAFF_ROSTER;

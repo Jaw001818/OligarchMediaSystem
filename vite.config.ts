@@ -8,8 +8,9 @@ export default defineConfig(() => {
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: [
+        { find: '@/officialStaffBackup', replacement: path.resolve(__dirname, 'src/officialStaffBackup.ts') },
         { find: '@', replacement: path.resolve(__dirname, '.') },
-        { find: /^(\.\/|\.\.\/)?data\/officialStaffBackup(\.ts)?$/, replacement: path.resolve(__dirname, 'src/officialStaffBackup.ts') },
+        { find: /^.*officialStaffBackup(\.ts)?$/, replacement: path.resolve(__dirname, 'src/officialStaffBackup.ts') },
       ],
     },
     server: {
