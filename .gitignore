@@ -4,7 +4,9 @@ dist-ssr/
 build/
 coverage/
 .aistudio/
-data/
+/data/
+!src/data/
+!src/data/**
 .DS_Store
 Thumbs.db
 *.log

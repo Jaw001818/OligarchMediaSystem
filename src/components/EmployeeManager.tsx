@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { db, handleFirestoreError, OperationType, collection, addDoc, doc, updateDoc, deleteDoc, query, where, getDocs, setDoc } from "../firebase";
 import { Employee, WeeklySchedule, DaySchedule, DayOfWeek, ScheduleOverride, Attendance, SalaryRateRecord } from "../types";
 import { formatTo12Hour, getEmployeeSchedule, getBusinessDate, DAYS_OF_WEEK, createDefaultWeeklySchedule, calculateAttendanceHours, getBirthdayWeekInfo, calculateSalaryIncrease, getEmployeeRateForDate } from "../utils";
-import { OFFICIAL_JOEMARIE_PANGAN } from "../data/officialStaffBackup";
+import { OFFICIAL_JOEMARIE_PANGAN } from "../officialStaffBackup";
 import { 
   Plus, 
   Search, 
