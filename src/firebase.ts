@@ -299,7 +299,7 @@ export function limit(n: number): any {
 export { serverTimestamp };
 
 // =========================================================
-// DUAL-ENGINE: SERVER PERSISTENT STORE & SSE MULTI-DEVICE MESH
+// REAL-TIME FIRESTORE & OFFLINE-READY DATA ENGINE
 // =========================================================
 
 let sseConnection: EventSource | null = null;
@@ -307,6 +307,10 @@ const sseCollectionSubscribers = new Map<string, Set<() => void>>();
 
 function ensureSseConnection() {
   if (!isBrowser || sseConnection) return;
+  // Only connect SSE when running in local development mode with Express dev server
+  if (window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
+    return;
+  }
   try {
     sseConnection = new EventSource("/api/db-events");
     sseConnection.onmessage = (event) => {
@@ -316,27 +320,7 @@ function ensureSseConnection() {
           const col = payload.collection;
           fetchServerCollection(col).then((updatedItems) => {
             if (updatedItems && Array.isArray(updatedItems)) {
-              const currentList = inMemoryCache[col] || [];
-              const itemMap = new Map<string, any>();
-              currentList.forEach((it: any) => {
-                const k = it.id || it.date;
-                if (k) itemMap.set(k, it);
-              });
-              updatedItems.forEach((it: any) => {
-                const k = it.id || it.date;
-                if (!k) return;
-                const existing = itemMap.get(k);
-                if (!existing) {
-                  itemMap.set(k, it);
-                } else {
-                  const existingTime = Number(existing.updatedAt || existing.timestamp || 0);
-                  const incomingTime = Number(it.updatedAt || it.timestamp || 0);
-                  if (incomingTime >= existingTime) {
-                    itemMap.set(k, { ...existing, ...it });
-                  }
-                }
-              });
-              inMemoryCache[col] = Array.from(itemMap.values());
+              inMemoryCache[col] = updatedItems;
               const subs = sseCollectionSubscribers.get(col);
               if (subs) subs.forEach((cb) => cb());
             }
@@ -344,14 +328,15 @@ function ensureSseConnection() {
         }
       } catch {}
     };
-    sseConnection.onerror = () => {
-      // EventSource auto-reconnects
-    };
   } catch {}
 }
 
 async function fetchServerCollection(colName: string): Promise<any[] | null> {
   if (!isBrowser || !colName) return null;
+  // Only fetch server store in local development environment
+  if (window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
+    return null;
+  }
   try {
     const res = await fetch(`/api/persistent-store?collection=${encodeURIComponent(colName)}`);
     if (!res.ok) return null;
@@ -364,6 +349,9 @@ async function fetchServerCollection(colName: string): Promise<any[] | null> {
 
 async function syncToServerStore(colName: string, item: any, action: "UPSERT" | "DELETE") {
   if (!isBrowser || !colName) return;
+  if (window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
+    return;
+  }
   try {
     if (action === "UPSERT") {
       fetch("/api/persistent-store/upsert-item", {
@@ -393,7 +381,7 @@ function notifyLocalSubscribers(colName: string) {
 }
 
 // =========================================================
-// CENTRAL FIRESTORE & DUAL-ENGINE CRUD OPERATIONS
+// CENTRAL CLOUD FIRESTORE CRUD OPERATIONS
 // =========================================================
 
 export async function addDoc(collectionRef: any, data: any): Promise<any> {
@@ -415,25 +403,24 @@ export async function addDoc(collectionRef: any, data: any): Promise<any> {
     updatedAt: Date.now()
   };
 
-  // 1. Dual-Engine: Immediate commit to Unlimited Server Store & In-Memory Cache (NEVER BLOCKED)
-  const existingList = inMemoryCache[effectiveCol] || [];
-  inMemoryCache[effectiveCol] = [...existingList.filter((x: any) => x.id !== generatedId), payload];
-  notifyLocalSubscribers(effectiveCol);
-  syncToServerStore(effectiveCol, payload, "UPSERT");
-
-  // 2. Dual-Engine: Mirror to Cloud Firestore if within quota
   try {
     const realRef = collection(db, effectiveCol);
     const res = await firestoreAddDoc(realRef, payload);
+    const existingList = inMemoryCache[effectiveCol] || [];
+    inMemoryCache[effectiveCol] = [...existingList.filter((x: any) => x.id !== generatedId), { ...payload, id: res.id || generatedId }];
+    notifyLocalSubscribers(effectiveCol);
+    syncToServerStore(effectiveCol, payload, "UPSERT");
     return res;
   } catch (err: any) {
     checkAndActivateSandboxOnQuotaError(err);
-    // Queue offline action in IndexedDB
     await SyncQueueService.enqueue({
       moduleName: effectiveCol,
       action: "CREATE",
       payload: { ...payload, id: generatedId, syncStatus: "PENDING_SYNC" }
     });
+    const existingList = inMemoryCache[effectiveCol] || [];
+    inMemoryCache[effectiveCol] = [...existingList.filter((x: any) => x.id !== generatedId), payload];
+    notifyLocalSubscribers(effectiveCol);
     return { id: generatedId, __metaColName: effectiveCol, __metaDocId: generatedId };
   }
 }
@@ -450,35 +437,35 @@ export async function setDoc(docRef: any, data: any, options?: any): Promise<voi
     updatedAt: data?.updatedAt ? Math.max(Number(data.updatedAt) || 0, Date.now()) : Date.now()
   };
 
-  // If re-saving an item, remove any stale tombstone
-  if (effectiveCol !== "deleted_records") {
-    deletedTombstoneSet.delete(`${effectiveCol}:${effectiveId}`);
-  }
-
-  // 1. Dual-Engine: Immediate commit to Unlimited Server Store & In-Memory Cache (NEVER BLOCKED)
-  const existingList = inMemoryCache[effectiveCol] || [];
-  const idx = existingList.findIndex((x: any) => x.id === effectiveId || (effectiveCol === "devotion_schedules" && x.date === effectiveId));
-  if (idx !== -1) {
-    existingList[idx] = options?.merge ? { ...existingList[idx], ...payload } : payload;
-  } else {
-    existingList.push(payload);
-  }
-  inMemoryCache[effectiveCol] = existingList;
-  notifyLocalSubscribers(effectiveCol);
-  syncToServerStore(effectiveCol, payload, "UPSERT");
-
-  // 2. Dual-Engine: Mirror to Cloud Firestore if within quota
   try {
     const realDocRef = doc(db, effectiveCol, effectiveId);
     await firestoreSetDoc(realDocRef, payload, options);
+    const existingList = inMemoryCache[effectiveCol] || [];
+    const idx = existingList.findIndex((x: any) => x.id === effectiveId || (effectiveCol === "devotion_schedules" && x.date === effectiveId));
+    if (idx !== -1) {
+      existingList[idx] = options?.merge ? { ...existingList[idx], ...payload } : payload;
+    } else {
+      existingList.push(payload);
+    }
+    inMemoryCache[effectiveCol] = existingList;
+    notifyLocalSubscribers(effectiveCol);
+    syncToServerStore(effectiveCol, payload, "UPSERT");
   } catch (err: any) {
     checkAndActivateSandboxOnQuotaError(err);
-    // Queue action in IndexedDB
     await SyncQueueService.enqueue({
       moduleName: effectiveCol,
       action: "UPDATE",
       payload: { ...payload, id: effectiveId, syncStatus: "PENDING_SYNC" }
     });
+    const existingList = inMemoryCache[effectiveCol] || [];
+    const idx = existingList.findIndex((x: any) => x.id === effectiveId || (effectiveCol === "devotion_schedules" && x.date === effectiveId));
+    if (idx !== -1) {
+      existingList[idx] = options?.merge ? { ...existingList[idx], ...payload } : payload;
+    } else {
+      existingList.push(payload);
+    }
+    inMemoryCache[effectiveCol] = existingList;
+    notifyLocalSubscribers(effectiveCol);
   }
 }
 
@@ -494,28 +481,29 @@ export async function updateDoc(docRef: any, data: any): Promise<void> {
     updatedAt: Date.now()
   };
 
-  // 1. Dual-Engine: Immediate commit to Unlimited Server Store & In-Memory Cache
-  const existingList = inMemoryCache[effectiveCol] || [];
-  const idx = existingList.findIndex((x: any) => x.id === effectiveId);
-  if (idx !== -1) {
-    existingList[idx] = { ...existingList[idx], ...payload };
-    inMemoryCache[effectiveCol] = existingList;
-    notifyLocalSubscribers(effectiveCol);
-    syncToServerStore(effectiveCol, existingList[idx], "UPSERT");
-  } else {
-    notifyLocalSubscribers(effectiveCol);
-    syncToServerStore(effectiveCol, payload, "UPSERT");
-  }
-
-  // 2. Dual-Engine: Mirror to Cloud Firestore
   try {
     const realDocRef = doc(db, effectiveCol, effectiveId);
     await firestoreUpdateDoc(realDocRef, payload);
+    const existingList = inMemoryCache[effectiveCol] || [];
+    const idx = existingList.findIndex((x: any) => x.id === effectiveId);
+    if (idx !== -1) {
+      existingList[idx] = { ...existingList[idx], ...payload };
+      inMemoryCache[effectiveCol] = existingList;
+    }
+    notifyLocalSubscribers(effectiveCol);
+    syncToServerStore(effectiveCol, payload, "UPSERT");
   } catch (err: any) {
     if (!checkAndActivateSandboxOnQuotaError(err)) {
       try {
         const realDocRef = doc(db, effectiveCol, effectiveId);
         await firestoreSetDoc(realDocRef, payload, { merge: true });
+        const existingList = inMemoryCache[effectiveCol] || [];
+        const idx = existingList.findIndex((x: any) => x.id === effectiveId);
+        if (idx !== -1) {
+          existingList[idx] = { ...existingList[idx], ...payload };
+          inMemoryCache[effectiveCol] = existingList;
+        }
+        notifyLocalSubscribers(effectiveCol);
       } catch (innerErr) {
         checkAndActivateSandboxOnQuotaError(innerErr);
         await SyncQueueService.enqueue({
@@ -538,15 +526,6 @@ export async function deleteDoc(docRef: any): Promise<void> {
   const { colName, docId } = extractRefInfo(docRef);
   if (!colName || !docId) return;
   ensureSseConnection();
-
-  // Record tombstone in memory immediately
-  deletedTombstoneSet.add(`${colName}:${docId}`);
-
-  // 1. Dual-Engine: Delete from Unlimited Server Store & In-Memory Cache
-  const existingList = inMemoryCache[colName] || [];
-  inMemoryCache[colName] = existingList.filter((x: any) => x.id !== docId && !(colName === "devotion_schedules" && x.date === docId));
-  notifyLocalSubscribers(colName);
-  syncToServerStore(colName, { id: docId }, "DELETE");
 
   // Safeguard: Archive into deleted_records (Recycle Bin) before permanent deletion
   if (colName !== "deleted_records") {
@@ -571,10 +550,14 @@ export async function deleteDoc(docRef: any): Promise<void> {
     } catch {}
   }
 
-  // 2. Dual-Engine: Mirror deletion to Cloud Firestore
+  // Delete directly from Cloud Firestore
   try {
     const realDocRef = doc(db, colName, docId);
     await firestoreDeleteDoc(realDocRef);
+    const existingList = inMemoryCache[colName] || [];
+    inMemoryCache[colName] = existingList.filter((x: any) => x.id !== docId && !(colName === "devotion_schedules" && x.date === docId));
+    notifyLocalSubscribers(colName);
+    syncToServerStore(colName, { id: docId }, "DELETE");
   } catch (err: any) {
     checkAndActivateSandboxOnQuotaError(err);
     await SyncQueueService.enqueue({
@@ -582,6 +565,9 @@ export async function deleteDoc(docRef: any): Promise<void> {
       action: "DELETE",
       payload: { id: docId }
     });
+    const existingList = inMemoryCache[colName] || [];
+    inMemoryCache[colName] = existingList.filter((x: any) => x.id !== docId && !(colName === "devotion_schedules" && x.date === docId));
+    notifyLocalSubscribers(colName);
   }
 }
 
@@ -591,40 +577,15 @@ export async function getDocs(queryOrColRef: any): Promise<any> {
 
   try {
     const snap = await firestoreGetDocs(queryOrColRef);
-    if (colName === "deleted_records") {
-      // Update local tombstone set from remote deleted_records
-      snap.forEach((d: any) => {
-        const data = d.data();
-        if (data.originalCollection && data.originalId && data.originalId !== "Y5fCWLfZk5lfg2Ocp1f9") {
-          deletedTombstoneSet.add(`${data.originalCollection}:${data.originalId}`);
-        }
-      });
-      return snap;
-    }
-
-    // Cache Firestore results into inMemoryCache
     const items = snap.docs.map((d: any) => ({ ...d.data(), id: d.id }));
-    if (items.length > 0) {
+    if (items.length > 0 && colName) {
       inMemoryCache[colName] = items;
-    }
-
-    // Filter out any tombstoned items
-    if (deletedTombstoneSet.size > 0 && colName) {
-      const filteredDocs = snap.docs.filter((d: any) => !deletedTombstoneSet.has(`${colName}:${d.id}`));
-      return {
-        empty: filteredDocs.length === 0,
-        size: filteredDocs.length,
-        docs: filteredDocs,
-        forEach: (callback: (d: any) => void) => filteredDocs.forEach(callback)
-      };
     }
     return snap;
   } catch (err: any) {
     checkAndActivateSandboxOnQuotaError(err);
-    // Dual-Engine Fallback: read from server store / memory cache
-    const serverItems = (await fetchServerCollection(colName)) || inMemoryCache[colName] || [];
-    const validItems = serverItems.filter((d: any) => !deletedTombstoneSet.has(`${colName}:${d.id}`));
-    const syntheticDocs = validItems.map((item: any) => ({
+    const serverItems = inMemoryCache[colName] || (await fetchServerCollection(colName)) || [];
+    const syntheticDocs = serverItems.map((item: any) => ({
       id: item.id || item.date,
       data: () => item,
       exists: () => true
@@ -642,19 +603,11 @@ export async function getDoc(docRef: any): Promise<any> {
   const { colName, docId } = extractRefInfo(docRef);
   ensureSseConnection();
 
-  if (colName && docId && deletedTombstoneSet.has(`${colName}:${docId}`) && colName !== "deleted_records") {
-    return {
-      exists: () => false,
-      id: docId,
-      data: () => null
-    };
-  }
   try {
     const snap = await firestoreGetDoc(docRef);
     if (snap.exists()) {
       return snap;
     }
-    // If not in firestore, check server persistent store
     const serverItems = inMemoryCache[colName] || (await fetchServerCollection(colName)) || [];
     const item = serverItems.find((x: any) => x.id === docId || (colName === "devotion_schedules" && x.date === docId));
     if (item) {
@@ -695,106 +648,50 @@ export function onSnapshot(
 
   let isSubscribed = true;
 
-  // Helper to build synthetic snapshot from cache / server store
-  const emitLocalSnapshot = async () => {
-    if (!isSubscribed || !colName) return;
-    if (isDoc) {
-      const items = inMemoryCache[colName] || (await fetchServerCollection(colName)) || [];
-      const item = items.find((x: any) => x.id === docId || (colName === "devotion_schedules" && x.date === docId));
-      if (!item || (deletedTombstoneSet.has(`${colName}:${docId}`) && colName !== "deleted_records")) {
-        onNext({ exists: () => false, id: docId, data: () => null });
-      } else {
-        onNext({ exists: () => true, id: docId, data: () => item });
-      }
-    } else {
-      let items = inMemoryCache[colName];
-      if (!items || items.length === 0) {
-        items = (await fetchServerCollection(colName)) || [];
-        if (items.length > 0) inMemoryCache[colName] = items;
-      }
-      const valid = items.filter((d: any) => !deletedTombstoneSet.has(`${colName}:${d.id}`));
-      const docs = valid.map((item: any) => ({
-        id: item.id || item.date,
-        data: () => item,
-        exists: () => true
-      }));
-      onNext({
-        empty: docs.length === 0,
-        size: docs.length,
-        docs,
-        forEach: (cb: (d: any) => void) => docs.forEach(cb)
-      });
-    }
-  };
-
-  // Register with SSE collection subscriber
-  if (colName) {
-    if (!sseCollectionSubscribers.has(colName)) {
-      sseCollectionSubscribers.set(colName, new Set());
-    }
-    sseCollectionSubscribers.get(colName)!.add(emitLocalSnapshot);
-    // Proactively emit server snapshot immediately so UI renders instantaneously without quota delays
-    emitLocalSnapshot();
-  }
-
   const unsubscribeFirestore = firestoreOnSnapshot(
     queryOrDocRef,
     (snap: any) => {
       if (!isSubscribed) return;
       if (isDoc) {
-        if (colName && docId && deletedTombstoneSet.has(`${colName}:${docId}`) && colName !== "deleted_records") {
-          onNext({
-            exists: () => false,
-            id: docId,
-            data: () => null
-          });
-          return;
-        }
         onNext(snap);
       } else {
-        if (colName === "deleted_records") {
-          snap.forEach((d: any) => {
-            const data = d.data();
-            if (data.originalCollection && data.originalId && data.originalId !== "Y5fCWLfZk5lfg2Ocp1f9") {
-              deletedTombstoneSet.add(`${data.originalCollection}:${data.originalId}`);
-            }
-          });
-          onNext(snap);
-          return;
-        }
-
-        // Cache remote items into inMemoryCache
         const remoteItems = snap.docs.map((d: any) => ({ ...d.data(), id: d.id }));
-        if (remoteItems.length > 0) {
+        if (remoteItems.length > 0 && colName) {
           inMemoryCache[colName] = remoteItems;
-        }
-
-        if (deletedTombstoneSet.size > 0 && colName) {
-          const validDocs = snap.docs.filter((d: any) => !deletedTombstoneSet.has(`${colName}:${d.id}`));
-          onNext({
-            empty: validDocs.length === 0,
-            size: validDocs.length,
-            docs: validDocs,
-            forEach: (callback: (d: any) => void) => validDocs.forEach(callback)
-          });
-          return;
         }
         onNext(snap);
       }
     },
     (err: any) => {
       checkAndActivateSandboxOnQuotaError(err);
-      // Seamless Dual-Engine fallback to server store
-      emitLocalSnapshot();
+      if (isDoc) {
+        const items = inMemoryCache[colName] || [];
+        const item = items.find((x: any) => x.id === docId || (colName === "devotion_schedules" && x.date === docId));
+        if (item) {
+          onNext({ exists: () => true, id: docId, data: () => item });
+        } else {
+          onNext({ exists: () => false, id: docId, data: () => null });
+        }
+      } else {
+        const items = inMemoryCache[colName] || [];
+        const docs = items.map((item: any) => ({
+          id: item.id || item.date,
+          data: () => item,
+          exists: () => true
+        }));
+        onNext({
+          empty: docs.length === 0,
+          size: docs.length,
+          docs,
+          forEach: (cb: (d: any) => void) => docs.forEach(cb)
+        });
+      }
       if (onError) onError(err);
     }
   );
 
   return () => {
     isSubscribed = false;
-    if (colName && sseCollectionSubscribers.has(colName)) {
-      sseCollectionSubscribers.get(colName)!.delete(emitLocalSnapshot);
-    }
     try {
       unsubscribeFirestore();
     } catch {}

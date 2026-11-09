@@ -4519,14 +4519,14 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
                     <button
                       type="button"
                       onClick={handlePortalTimeOut}
-                      disabled={!todayAttendance || todayAttendance.status === "Timed Out" || todayAttendance.status === "On Break" || isSubmittingPunch}
+                      disabled={!todayAttendance || todayAttendance.status === "Timed Out" || Boolean(todayAttendance.timeOut) || todayAttendance.status === "On Break" || isSubmittingPunch}
                       className={`relative p-5 rounded-2xl font-black font-sans text-xs uppercase tracking-wider transition-all duration-200 flex flex-col items-center justify-center gap-2 border shadow-lg ${
-                        todayAttendance && todayAttendance.status !== "Timed Out" && todayAttendance.status !== "On Break"
+                        todayAttendance && todayAttendance.status !== "Timed Out" && !todayAttendance.timeOut && todayAttendance.status !== "On Break"
                           ? "bg-gradient-to-r from-rose-600 via-rose-500 to-red-600 hover:from-rose-500 hover:to-red-500 text-white border-rose-400/40 shadow-rose-950/50 hover:scale-[1.02] active:scale-[0.98] cursor-pointer ring-1 ring-rose-400/30"
                           : "bg-zinc-900/60 text-zinc-500 border-zinc-800/80 opacity-60 cursor-not-allowed"
                       }`}
                     >
-                      {isSubmittingPunch && todayAttendance && todayAttendance.status !== "Timed Out" ? (
+                      {isSubmittingPunch && todayAttendance && todayAttendance.status !== "Timed Out" && !todayAttendance.timeOut ? (
                         <>
                           <RefreshCw className="w-6 h-6 animate-spin text-rose-300" />
                           <span className="font-mono text-[11px]">Recording Punch...</span>
@@ -4538,10 +4538,10 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
                             <span className="text-sm font-black">Time Out</span>
                           </div>
                           <span className="text-[10px] font-mono font-normal opacity-80 normal-case tracking-normal">
-                            {todayAttendance && todayAttendance.status !== "Timed Out"
-                              ? "Tap to record shift end accurately"
-                              : todayAttendance?.status === "Timed Out"
+                            {todayAttendance && (todayAttendance.status === "Timed Out" || todayAttendance.timeOut)
                               ? `Logged: ${todayAttendance.timeOut ? formatTo12Hour(todayAttendance.timeOut) : "Completed"}`
+                              : todayAttendance && todayAttendance.status !== "On Break"
+                              ? "Tap to record shift end accurately"
                               : "Requires active Clock-In"}
                           </span>
                         </>

@@ -958,7 +958,7 @@ export default function AttendanceManager({
         hoursWorked: math.hoursWorked,
         otHours: math.otHours,
         lateMinutes: record.lateMinutes ?? math.lateMinutes ?? 0,
-        status: (record.lateMinutes || math.lateMinutes) && (record.lateMinutes > 0 || math.lateMinutes > 0) && !record.isLateExcused ? "Late" : "Present",
+        status: "Timed Out",
         accumulatedBreakSeconds: newAccumulated,
         shiftStart: currentShiftStart,
         shiftEnd: currentShiftEnd,
@@ -1515,9 +1515,9 @@ export default function AttendanceManager({
                   const empSched = getEmployeeSchedule(emp, { workHourStart, workHourEnd }, selectedDate);
 
                   // Compute active status flags
-                  const isWorking = record && (record.status === "Present" || record.status === "Late" || record.status === "On Break");
-                  const isOnBreak = record && record.status === "On Break";
-                  const isTimedOut = record && record.status === "Timed Out";
+                  const isTimedOut = record && (record.status === "Timed Out" || Boolean(record.timeOut));
+                  const isWorking = record && !isTimedOut && (record.status === "Present" || record.status === "Late" || record.status === "On Break");
+                  const isOnBreak = record && !isTimedOut && record.status === "On Break";
                   const isAbsent = record && record.status === "Absent";
                   const isUnlogged = !record;
                   const isLogProcessing = processing === emp.id;
@@ -1541,18 +1541,30 @@ export default function AttendanceManager({
                       key={emp.id} 
                       className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-5 shadow-xs hover:shadow-md transition-all duration-300 flex flex-col justify-between h-full relative"
                     >
-                      {/* Top Row - Status Badge & Punch Time In */}
+                      {/* Top Row - Status Badge & Punch Time In / Time Out */}
                       <div className="flex items-center justify-between gap-2">
                         <span className={`px-2.5 py-1 text-[9px] font-bold font-mono tracking-wide uppercase rounded-full border ${badgeColorClass}`}>
                           {currentStatusLabel}
                         </span>
-                        <div className="text-right">
-                          <span className="text-[9px] font-bold text-zinc-400 dark:text-zinc-500 tracking-wider uppercase font-mono block mb-0.5">
-                            PUNCH TIME IN
-                          </span>
-                          <span className="text-[11px] font-black text-zinc-800 dark:text-zinc-200 font-mono tracking-tight block">
-                            {record?.timeIn ? formatTo12Hour(record.timeIn) : "—— ——"}
-                          </span>
+                        <div className="flex items-center gap-3 text-right">
+                          <div>
+                            <span className="text-[9px] font-bold text-zinc-400 dark:text-zinc-500 tracking-wider uppercase font-mono block mb-0.5">
+                              TIME IN
+                            </span>
+                            <span className="text-[11px] font-black text-zinc-800 dark:text-zinc-200 font-mono tracking-tight block">
+                              {record?.timeIn ? formatTo12Hour(record.timeIn) : "—— ——"}
+                            </span>
+                          </div>
+                          {record?.timeOut && (
+                            <div className="pl-2 border-l border-zinc-200 dark:border-zinc-800">
+                              <span className="text-[9px] font-bold text-rose-500 dark:text-rose-400 tracking-wider uppercase font-mono block mb-0.5">
+                                TIME OUT
+                              </span>
+                              <span className="text-[11px] font-black text-rose-600 dark:text-rose-400 font-mono tracking-tight block">
+                                {formatTo12Hour(record.timeOut)}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -1655,10 +1667,10 @@ export default function AttendanceManager({
                         ) : (
                           <button
                             onClick={() => record && handleStartBreak(record)}
-                            disabled={!record || isLogProcessing}
-                            className={`px-1.5 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-200 flex flex-col items-center justify-center gap-1.5 leading-none cursor-pointer ${
-                              record && !isLogProcessing
-                                ? "bg-zinc-100 hover:bg-amber-50 hover:text-amber-600 dark:bg-zinc-900 dark:hover:bg-zinc-850 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800"
+                            disabled={!record || isLogProcessing || isTimedOut}
+                            className={`px-1.5 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-200 flex flex-col items-center justify-center gap-1.5 leading-none ${
+                              record && !isLogProcessing && !isTimedOut
+                                ? "bg-zinc-100 hover:bg-amber-50 hover:text-amber-600 dark:bg-zinc-900 dark:hover:bg-zinc-850 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800 cursor-pointer"
                                 : "bg-zinc-50 dark:bg-zinc-900/40 text-zinc-350 dark:text-zinc-650 border border-zinc-100 dark:border-zinc-900/30 cursor-not-allowed opacity-40"
                             }`}
                           >
@@ -1670,15 +1682,17 @@ export default function AttendanceManager({
                         {/* 3. TIME OUT action button with robust rose style as in user mockup */}
                         <button
                           onClick={() => record && handleTimeOut(record)}
-                          disabled={!record || isLogProcessing}
-                          className={`px-1.5 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-200 flex flex-col items-center justify-center gap-1.5 leading-none cursor-pointer ${
-                            record && !isLogProcessing
-                              ? "bg-rose-600 hover:bg-rose-700 text-white shadow-sm border border-rose-500/30"
+                          disabled={!record || isLogProcessing || isTimedOut}
+                          className={`px-1.5 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-200 flex flex-col items-center justify-center gap-1.5 leading-none ${
+                            isTimedOut
+                              ? "bg-zinc-100 dark:bg-zinc-850 text-zinc-400 dark:text-zinc-500 border border-zinc-200 dark:border-zinc-800 cursor-not-allowed"
+                              : record && isWorking && !isLogProcessing
+                              ? "bg-rose-600 hover:bg-rose-700 text-white shadow-sm border border-rose-500/30 cursor-pointer"
                               : "bg-zinc-50 dark:bg-zinc-900/40 text-zinc-350 dark:text-zinc-650 border border-zinc-100 dark:border-zinc-900/30 cursor-not-allowed opacity-40"
                           }`}
                         >
                           <CheckCircle className="w-3.5 h-3.5" />
-                          <span>Time Out</span>
+                          <span>{isTimedOut ? "Timed Out" : "Time Out"}</span>
                         </button>
                       </div>
 
@@ -1955,7 +1969,7 @@ export default function AttendanceManager({
                                 </button>
                               ) : (
                                 <div className="flex items-center gap-1.5">
-                                  {record.status === "Present" || record.status === "Late" ? (
+                                  {(!record.timeOut && record.status !== "Timed Out" && (record.status === "Present" || record.status === "Late")) ? (
                                     <>
                                       <button
                                         onClick={() => handleStartBreak(record)}
@@ -1979,8 +1993,11 @@ export default function AttendanceManager({
                                     >
                                       Resume Shift
                                     </button>
-                                  ) : record.status === "Timed Out" ? (
-                                    <span className="text-[9px] font-mono rounded bg-zinc-100 dark:bg-zinc-900 px-1.5 py-0.5 text-zinc-450 dark:text-zinc-500 uppercase tracking-widest font-black leading-relaxed">Closed</span>
+                                  ) : (record.status === "Timed Out" || Boolean(record.timeOut)) ? (
+                                    <span className="text-[9px] font-mono rounded bg-zinc-100 dark:bg-zinc-900 px-1.5 py-0.5 text-zinc-500 dark:text-zinc-400 uppercase tracking-widest font-black leading-relaxed inline-flex items-center gap-1">
+                                      <CheckCircle className="w-2.5 h-2.5 text-emerald-500" />
+                                      <span>Timed Out {record.timeOut ? `(${formatTo12Hour(record.timeOut)})` : ""}</span>
+                                    </span>
                                   ) : (
                                     <span className="text-[9px] font-mono rounded bg-red-50 dark:bg-red-950/20 px-1.5 py-0.5 text-red-650 uppercase tracking-widest font-black leading-relaxed">Absent</span>
                                   )}

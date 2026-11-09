@@ -583,7 +583,7 @@ export async function ensureEmployee002Exists() {
 
     const currentUser = auth?.currentUser;
     const currentEmail = currentUser?.email?.toLowerCase() || "";
-    const isAdmin = currentEmail === "hr.oligarchmedia@gmail.com" || currentEmail === "oligarchmediaph@gmail.com";
+    const isAdmin = currentEmail === "hr.oligarchmedia@gmail.com" || currentEmail === "oligarchmediaph@gmail.com" || currentEmail === "joemariegpangan18@gmail.com";
 
     if (!canonicalSnap.exists() && isAdmin) {
       console.log("Restoring official profile for PANGAN, JOEMARIE G (002)...");
