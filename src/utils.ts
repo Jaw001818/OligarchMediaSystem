@@ -569,26 +569,17 @@ export function calculateAttendanceHours(
 }
 
 export async function ensureEmployee002Exists() {
-  if (typeof window !== "undefined" && sessionStorage.getItem("emp_002_verified")) {
-    return;
-  }
-  const { doc, getDoc, setDoc } = await import("./firebase");
-  const { db, auth } = await import("./firebase");
+  const { doc, getDoc, setDoc, db } = await import("./firebase");
   try {
-    if (typeof window !== "undefined") {
-      sessionStorage.setItem("emp_002_verified", "true");
-    }
     const canonicalDocRef = doc(db, "employees", "Y5fCWLfZk5lfg2Ocp1f9");
     const canonicalSnap = await getDoc(canonicalDocRef);
 
-    const currentUser = auth?.currentUser;
-    const currentEmail = currentUser?.email?.toLowerCase() || "";
-    const isAdmin = currentEmail === "hr.oligarchmedia@gmail.com" || currentEmail === "oligarchmediaph@gmail.com" || currentEmail === "joemariegpangan18@gmail.com";
-
-    if (!canonicalSnap.exists() && isAdmin) {
-      console.log("Restoring official profile for PANGAN, JOEMARIE G (002)...");
+    if (!canonicalSnap.exists()) {
+      console.log("Self-healing: Restoring official profile for PANGAN, JOEMARIE G (002)...");
       await setDoc(canonicalDocRef, {
         ...OFFICIAL_JOEMARIE_PANGAN,
+        id: "Y5fCWLfZk5lfg2Ocp1f9",
+        status: "Active",
         updatedAt: Date.now()
       }, { merge: true });
     }

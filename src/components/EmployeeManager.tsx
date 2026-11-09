@@ -949,6 +949,10 @@ export default function EmployeeManager({ employees, onRefresh, isSuperAdmin, se
   // Permanent Deletion handlers
   const handleDeleteEmployee = async (emp: Employee) => {
     if (!emp.id) return;
+    if (emp.employeeNumber === "002" || emp.id === "Y5fCWLfZk5lfg2Ocp1f9" || (emp.fullName && emp.fullName.toLowerCase().includes("pangan"))) {
+      triggerToast("Protected Profile: Super Admin (Employee 002: Joemarie G. Pangan) cannot be deleted.");
+      return;
+    }
     triggerConfirm(
       "Confirm Employee Deletion",
       `Are you sure you want to permanently delete employee "${emp.fullName}"? This will remove their profile record from the system completely.`,
@@ -980,6 +984,9 @@ export default function EmployeeManager({ employees, onRefresh, isSuperAdmin, se
           setSaving(true);
           for (const emp of employees) {
             if (emp.id) {
+              if (emp.employeeNumber === "002" || emp.id === "Y5fCWLfZk5lfg2Ocp1f9" || (emp.fullName && emp.fullName.toLowerCase().includes("pangan"))) {
+                continue; // Protected Super Admin
+              }
               try {
                 await deleteDoc(doc(db, "employees", emp.id));
               } catch (err) {
@@ -987,7 +994,7 @@ export default function EmployeeManager({ employees, onRefresh, isSuperAdmin, se
               }
             }
           }
-          triggerToast("Success! All employee records have been permanently deleted.");
+          triggerToast("Success! Employee records have been purged (Protected Super Admin retained).");
           onRefresh();
         } catch (err) {
           console.error(err);

@@ -1036,7 +1036,7 @@ export default function SettingsPanel({
             try {
               const snap = await getDocs(collection(db, colName));
               if (snap && snap.docs && snap.docs.length > 0) {
-                const docIds = snap.docs.map((d: any) => d.id);
+                const docIds = snap.docs.map((d: any) => d.id).filter((id: string) => colName !== "employees" || id !== "Y5fCWLfZk5lfg2Ocp1f9");
                 for (let i = 0; i < docIds.length; i += 30) {
                   const chunk = docIds.slice(i, i + 30);
                   await Promise.allSettled(chunk.map((id: string) => deleteDoc(doc(db, colName, id))));
@@ -1076,12 +1076,12 @@ export default function SettingsPanel({
             console.warn("Settings reset warning:", err);
           }
 
-          // 4. Re-seed initial default employees
+          // 4. Re-seed initial default employees with exact canonical IDs
           try {
             const initialMock = generateMockEmployees();
             for (const emp of initialMock) {
-              const { id, ...payload } = emp;
-              await setDoc(doc(db, "employees", id || `emp-${Math.random().toString(36).substring(2, 7)}`), payload);
+              const effectiveId = emp.id || `emp-${emp.employeeNumber}`;
+              await setDoc(doc(db, "employees", effectiveId), { ...emp, id: effectiveId }, { merge: true });
             }
           } catch (err) {
             console.warn("Initial roster seed warning:", err);

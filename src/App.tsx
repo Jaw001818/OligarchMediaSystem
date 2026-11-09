@@ -220,6 +220,9 @@ export default function App() {
       return unsubSettings;
     }
 
+    // Guarantee Super Admin Employee 002 (Joemarie G. Pangan) is present
+    ensureEmployee002Exists().catch(console.warn);
+
     // 1. Listen Employees
     const unsubEmployees = onSnapshot(
       collection(db, "employees"),
