@@ -2073,14 +2073,14 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
       doc.text("Accumulated Hours:", 110, 65);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(14, 165, 233); // sky-500
-      doc.text(`${totalHours.toFixed(2)} hrs`, 150, 65);
+      doc.text(`${(totalHours || 0).toFixed(2)} hrs`, 150, 65);
 
       doc.setTextColor(30, 41, 59);
       doc.setFont("helvetica", "bold");
       doc.text("Approved Overtime:", 110, 71);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(22, 163, 74); // green-600
-      doc.text(`${totalOT.toFixed(2)} hrs`, 150, 71);
+      doc.text(`${(totalOT || 0).toFixed(2)} hrs`, 150, 71);
 
       // Setup list headers
       let y = 96;
@@ -4488,7 +4488,7 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
                       className={`relative p-5 rounded-2xl font-black font-sans text-xs uppercase tracking-wider transition-all duration-200 flex flex-col items-center justify-center gap-2 border shadow-lg ${
                         !todayAttendance
                           ? "bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white border-emerald-400/40 shadow-emerald-950/50 hover:scale-[1.02] active:scale-[0.98] cursor-pointer ring-1 ring-emerald-400/30"
-                          : "bg-zinc-900/60 text-zinc-400 border-zinc-800/80 opacity-70 cursor-not-allowed"
+                          : "bg-slate-100 dark:bg-zinc-900/60 text-slate-400 dark:text-zinc-500 border-slate-200 dark:border-zinc-800/80 opacity-70 cursor-not-allowed"
                       }`}
                     >
                       {isSubmittingPunch && !todayAttendance ? (
@@ -4499,7 +4499,7 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
                       ) : (
                         <>
                           <div className="flex items-center gap-2">
-                            <LogIn className="w-5 h-5 text-emerald-300" />
+                            <LogIn className="w-5 h-5 text-emerald-500 dark:text-emerald-300" />
                             <span className="text-sm font-black">
                               {todayAttendance?.status === "Birthday Leave"
                                 ? "🎂 Birthday Leave (8h Paid)"
@@ -4523,7 +4523,7 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
                       className={`relative p-5 rounded-2xl font-black font-sans text-xs uppercase tracking-wider transition-all duration-200 flex flex-col items-center justify-center gap-2 border shadow-lg ${
                         todayAttendance && todayAttendance.status !== "Timed Out" && !todayAttendance.timeOut && todayAttendance.status !== "On Break"
                           ? "bg-gradient-to-r from-rose-600 via-rose-500 to-red-600 hover:from-rose-500 hover:to-red-500 text-white border-rose-400/40 shadow-rose-950/50 hover:scale-[1.02] active:scale-[0.98] cursor-pointer ring-1 ring-rose-400/30"
-                          : "bg-zinc-900/60 text-zinc-500 border-zinc-800/80 opacity-60 cursor-not-allowed"
+                          : "bg-slate-100 dark:bg-zinc-900/60 text-slate-400 dark:text-zinc-500 border-slate-200 dark:border-zinc-800/80 opacity-60 cursor-not-allowed"
                       }`}
                     >
                       {isSubmittingPunch && todayAttendance && todayAttendance.status !== "Timed Out" && !todayAttendance.timeOut ? (

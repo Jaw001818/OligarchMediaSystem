@@ -325,11 +325,11 @@ export default function AttendanceEditor({
     );
 
     if (type === "add") {
-      setNewHoursWorked(math.hoursWorked.toFixed(2));
-      setNewOtHours(math.otHours.toFixed(2));
+      setNewHoursWorked((math?.hoursWorked ?? 0).toFixed(2));
+      setNewOtHours((math?.otHours ?? 0).toFixed(2));
     } else {
-      setEditHoursWorked(math.hoursWorked.toFixed(2));
-      setEditOtHours(math.otHours.toFixed(2));
+      setEditHoursWorked((math?.hoursWorked ?? 0).toFixed(2));
+      setEditOtHours((math?.otHours ?? 0).toFixed(2));
     }
   };
 
@@ -784,7 +784,7 @@ export default function AttendanceEditor({
         pdf.text(record.timeIn ? formatTo12Hour(record.timeIn) : "—", 88, y);
         pdf.text(record.timeOut ? formatTo12Hour(record.timeOut) : "—", 112, y);
         pdf.text(record.status, 136, y);
-        pdf.text(`${record.hoursWorked.toFixed(2)} hrs (+${record.otHours.toFixed(2)} OT)`, 165, y);
+        pdf.text(`${(record.hoursWorked ?? 0).toFixed(2)} hrs (+${(record.otHours ?? 0).toFixed(2)} OT)`, 165, y);
 
         pdf.setDrawColor(241, 245, 249);
         pdf.line(15, y + 2, 195, y + 2);
@@ -1259,9 +1259,9 @@ export default function AttendanceEditor({
                                   </div>
                                 ) : (
                                   <div>
-                                    <p className="font-extrabold text-zinc-900 dark:text-[#CDD6F4]">{log.status === "Absent" ? "0.00" : log.hoursWorked.toFixed(2)} hrs</p>
-                                    <span className={`text-[9px] block font-semibold mt-0.5 ${log.status !== "Absent" && log.otHours > 0 ? 'text-green-600 dark:text-[#A6E3A1]' : 'text-zinc-400 dark:text-zinc-550'}`}>
-                                      (+{log.status === "Absent" ? "0.00" : log.otHours.toFixed(2)} OT)
+                                    <p className="font-extrabold text-zinc-900 dark:text-[#CDD6F4]">{log.status === "Absent" ? "0.00" : (log.hoursWorked ?? 0).toFixed(2)} hrs</p>
+                                    <span className={`text-[9px] block font-semibold mt-0.5 ${log.status !== "Absent" && (log.otHours ?? 0) > 0 ? 'text-green-600 dark:text-[#A6E3A1]' : 'text-zinc-400 dark:text-zinc-550'}`}>
+                                      (+{log.status === "Absent" ? "0.00" : (log.otHours ?? 0).toFixed(2)} OT)
                                     </span>
                                   </div>
                                 )}

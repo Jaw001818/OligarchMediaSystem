@@ -364,14 +364,14 @@ export default function AttendanceManager({
       doc.text("Hours Accumulated:", 115, 65);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(37, 99, 235); // blue-650
-      doc.text(`${totalHours.toFixed(2)} hrs`, 160, 65);
+      doc.text(`${(totalHours || 0).toFixed(2)} hrs`, 160, 65);
       doc.setTextColor(15, 23, 42);
       
       doc.setFont("helvetica", "bold");
       doc.text("Approved Overtime (OT):", 115, 71);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(22, 163, 74); // green-600
-      doc.text(`${totalOT.toFixed(2)} hrs`, 160, 71);
+      doc.text(`${(totalOT || 0).toFixed(2)} hrs`, 160, 71);
       doc.setTextColor(15, 23, 42);
       
       doc.setFont("helvetica", "bold");
@@ -500,11 +500,11 @@ export default function AttendanceManager({
 
           doc.setTextColor(15, 23, 42);
           doc.setFont("helvetica", "bold");
-          doc.text(`${rec.hoursWorked.toFixed(2)} hrs`, 158, y + 5.5);
+          doc.text(`${(rec?.hoursWorked ?? 0).toFixed(2)} hrs`, 158, y + 5.5);
 
-          if (rec.otHours > 0) {
+          if ((rec?.otHours ?? 0) > 0) {
             doc.setTextColor(22, 163, 74);
-            doc.text(`+${rec.otHours.toFixed(2)} hrs`, 180, y + 5.5);
+            doc.text(`+${(rec.otHours ?? 0).toFixed(2)} hrs`, 180, y + 5.5);
           } else {
             doc.setTextColor(148, 163, 184);
             doc.text("—", 180, y + 5.5);
@@ -618,11 +618,11 @@ export default function AttendanceManager({
     );
 
     if (type === "add") {
-      setNewHoursWorked(math.hoursWorked.toFixed(2));
-      setNewOtHours(math.otHours.toFixed(2));
+      setNewHoursWorked((math?.hoursWorked ?? 0).toFixed(2));
+      setNewOtHours((math?.otHours ?? 0).toFixed(2));
     } else {
-      setEditHoursWorked(math.hoursWorked.toFixed(2));
-      setEditOtHours(math.otHours.toFixed(2));
+      setEditHoursWorked((math?.hoursWorked ?? 0).toFixed(2));
+      setEditOtHours((math?.otHours ?? 0).toFixed(2));
     }
   };
 

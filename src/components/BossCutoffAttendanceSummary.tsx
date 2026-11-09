@@ -686,10 +686,10 @@ export default function BossCutoffAttendanceSummary({
       doc.text("TOTAL OVERTIME (OT)", margin + colW * 3 + 4, y + 6);
       doc.setFontSize(12);
       doc.setTextColor(147, 51, 234);
-      doc.text(`${overallMetrics.totalOTHours.toFixed(2)} hrs`, margin + colW * 3 + 4, y + 14);
+      doc.text(`${(overallMetrics?.totalOTHours ?? 0).toFixed(2)} hrs`, margin + colW * 3 + 4, y + 14);
       doc.setFontSize(6.5);
       doc.setTextColor(22, 163, 74);
-      doc.text(`Total ${overallMetrics.totalHoursWorked.toFixed(1)} regular hrs`, margin + colW * 3 + 4, y + 20);
+      doc.text(`Total ${(overallMetrics?.totalHoursWorked ?? 0).toFixed(1)} regular hrs`, margin + colW * 3 + 4, y + 20);
 
       y += 30;
 
@@ -750,9 +750,9 @@ export default function BossCutoffAttendanceSummary({
         doc.text(`${s.absentDays} d`, margin + 138, y + 4.5, { align: "right" });
 
         // OT (Purple/Amber)
-        if (s.totalOTHours > 0) {
+        if ((s?.totalOTHours ?? 0) > 0) {
           doc.setTextColor(147, 51, 234);
-          doc.text(`${s.totalOTHours.toFixed(1)} h`, margin + 160, y + 4.5, { align: "right" });
+          doc.text(`${(s?.totalOTHours ?? 0).toFixed(1)} h`, margin + 160, y + 4.5, { align: "right" });
         } else {
           doc.setTextColor(148, 163, 184);
           doc.text("0.0 h", margin + 160, y + 4.5, { align: "right" });
@@ -760,7 +760,7 @@ export default function BossCutoffAttendanceSummary({
 
         // Regular Hours
         doc.setTextColor(15, 23, 42);
-        doc.text(`${s.totalRegularHours.toFixed(1)} h`, margin + 180, y + 4.5, { align: "right" });
+        doc.text(`${(s?.totalRegularHours ?? 0).toFixed(1)} h`, margin + 180, y + 4.5, { align: "right" });
 
         y += 7.5;
       });
@@ -810,11 +810,11 @@ export default function BossCutoffAttendanceSummary({
 
         // Overtime Badge
         doc.setTextColor(147, 51, 234);
-        doc.text(`OVERTIME: +${s.totalOTHours.toFixed(2)} HRS`, badgeX, y + 16);
+        doc.text(`OVERTIME: +${(s?.totalOTHours ?? 0).toFixed(2)} HRS`, badgeX, y + 16);
 
         // Regular Hours
         doc.setTextColor(15, 23, 42);
-        doc.text(`REG. WORKED: ${s.totalRegularHours.toFixed(2)} HRS`, badgeX + 44, y + 16);
+        doc.text(`REG. WORKED: ${(s?.totalRegularHours ?? 0).toFixed(2)} HRS`, badgeX + 44, y + 16);
 
         y += 27;
 
@@ -917,13 +917,13 @@ export default function BossCutoffAttendanceSummary({
           // Regular Hours
           doc.setFont("helvetica", "normal");
           doc.setTextColor(15, 23, 42);
-          doc.text(d.hoursWorked > 0 ? `${d.hoursWorked.toFixed(2)} h` : (d.status === "No Work" ? "0.00 h" : "—"), margin + 118, y + 4.5, { align: "right" });
+          doc.text((d?.hoursWorked ?? 0) > 0 ? `${(d.hoursWorked ?? 0).toFixed(2)} h` : (d.status === "No Work" ? "0.00 h" : "—"), margin + 118, y + 4.5, { align: "right" });
 
           // Overtime Hours
-          if (d.otHours > 0) {
+          if ((d?.otHours ?? 0) > 0) {
             doc.setFont("helvetica", "bold");
             doc.setTextColor(147, 51, 234); // Purple
-            doc.text(`+${d.otHours.toFixed(2)} h`, margin + 148, y + 4.5, { align: "right" });
+            doc.text(`+${(d.otHours ?? 0).toFixed(2)} h`, margin + 148, y + 4.5, { align: "right" });
           } else {
             doc.setTextColor(148, 163, 184);
             doc.text("—", margin + 148, y + 4.5, { align: "right" });
@@ -962,9 +962,9 @@ export default function BossCutoffAttendanceSummary({
         doc.setTextColor(s.absentDays > 0 ? 220 : 100, s.absentDays > 0 ? 38 : 116, s.absentDays > 0 ? 38 : 139);
         doc.text(`${s.absentDays} Absent`, margin + 98, y + 5);
         doc.setTextColor(15, 23, 42);
-        doc.text(`${s.totalRegularHours.toFixed(2)} Regular Hrs`, margin + 118, y + 5, { align: "right" });
+        doc.text(`${(s?.totalRegularHours ?? 0).toFixed(2)} Regular Hrs`, margin + 118, y + 5, { align: "right" });
         doc.setTextColor(147, 51, 234);
-        doc.text(`+${s.totalOTHours.toFixed(2)} OT Hrs`, margin + 148, y + 5, { align: "right" });
+        doc.text(`+${(s?.totalOTHours ?? 0).toFixed(2)} OT Hrs`, margin + 148, y + 5, { align: "right" });
         y += 12;
       });
 
@@ -1153,7 +1153,7 @@ export default function BossCutoffAttendanceSummary({
             </div>
           </div>
           <div className="text-2xl font-black text-purple-600 dark:text-purple-400 mt-2">
-            +{overallMetrics.totalOTHours.toFixed(2)} <span className="text-xs font-normal text-zinc-400">hrs</span>
+            +{(overallMetrics?.totalOTHours ?? 0).toFixed(2)} <span className="text-xs font-normal text-zinc-400">hrs</span>
           </div>
           <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1">Accrued overtime shifts</p>
         </div>
@@ -1297,17 +1297,17 @@ export default function BossCutoffAttendanceSummary({
 
                     {/* Overtime (OT) Badge */}
                     <div className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 ${
-                      summary.totalOTHours > 0
+                      (summary?.totalOTHours ?? 0) > 0
                         ? "bg-purple-50 dark:bg-purple-950/30 border-purple-200/60 dark:border-purple-800/40 text-purple-700 dark:text-purple-300 font-black"
                         : "bg-zinc-100 dark:bg-zinc-800 border-zinc-200/60 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400"
                     }`}>
-                      <Clock className={`w-3.5 h-3.5 ${summary.totalOTHours > 0 ? "text-purple-600 dark:text-purple-400" : "text-zinc-400"}`} />
-                      <span>+{summary.totalOTHours.toFixed(2)}h OT</span>
+                      <Clock className={`w-3.5 h-3.5 ${(summary?.totalOTHours ?? 0) > 0 ? "text-purple-600 dark:text-purple-400" : "text-zinc-400"}`} />
+                      <span>+{(summary?.totalOTHours ?? 0).toFixed(2)}h OT</span>
                     </div>
 
                     {/* Regular Hours */}
                     <div className="px-3 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200/60 dark:border-blue-800/40 text-blue-700 dark:text-blue-400 font-bold text-xs">
-                      <span>{summary.totalRegularHours.toFixed(1)}h Reg</span>
+                      <span>{(summary?.totalRegularHours ?? 0).toFixed(1)}h Reg</span>
                     </div>
 
                     <div className="p-1 text-zinc-400">
@@ -1391,14 +1391,14 @@ export default function BossCutoffAttendanceSummary({
 
                                 {/* REGULAR WORKED HOURS */}
                                 <td className="py-2.5 px-3 text-right text-zinc-700 dark:text-zinc-300 font-bold">
-                                  {day.hoursWorked > 0 ? `${day.hoursWorked.toFixed(2)} hrs` : (isNoWorkDay ? <span className="text-amber-700 dark:text-amber-400 font-normal text-[11px]">0.00 hrs (No Pay)</span> : "—")}
+                                  {(day?.hoursWorked ?? 0) > 0 ? `${(day.hoursWorked ?? 0).toFixed(2)} hrs` : (isNoWorkDay ? <span className="text-amber-700 dark:text-amber-400 font-normal text-[11px]">0.00 hrs (No Pay)</span> : "—")}
                                 </td>
 
                                 {/* OVERTIME (OT) */}
                                 <td className="py-2.5 px-3 text-right">
-                                  {day.otHours > 0 ? (
+                                  {(day?.otHours ?? 0) > 0 ? (
                                     <span className="font-black text-purple-700 dark:text-purple-300 bg-purple-100/70 dark:bg-purple-950/50 px-2 py-0.5 rounded border border-purple-300 dark:border-purple-800/50">
-                                      +{day.otHours.toFixed(2)} hrs OT
+                                      +{(day.otHours ?? 0).toFixed(2)} hrs OT
                                     </span>
                                   ) : (
                                     <span className="text-zinc-400 text-[11px]">—</span>

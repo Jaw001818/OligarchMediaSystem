@@ -550,8 +550,8 @@ export function calculateAttendanceHours(
   
   // Cap regular hours worked to standardWorkMins so it doesn't double count OT
   const regularWorkMins = Math.min(netWorkMins, standardWorkMins);
-  const hoursWorked = parseFloat((regularWorkMins / 60).toFixed(2));
-  const otHours = parseFloat((otMins / 60).toFixed(2));
+  const hoursWorked = isNaN(regularWorkMins) ? 0 : parseFloat(((regularWorkMins || 0) / 60).toFixed(2));
+  const otHours = isNaN(otMins) ? 0 : parseFloat(((otMins || 0) / 60).toFixed(2));
 
   const isNight = isQualifyingNightShift(scheduledIn, scheduledOut, timeIn);
   const companyNightShiftHours = isNight ? parseFloat(Math.min(8.0, hoursWorked).toFixed(2)) : 0;

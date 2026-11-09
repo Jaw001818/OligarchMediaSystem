@@ -2888,9 +2888,9 @@ Official electronic payroll notification. Printable payslip statement is accessi
       doc.setFontSize(8);
       doc.setTextColor(15, 23, 42);
       // Reg Hours
-      doc.text(`${regHours.toFixed(1)} hrs`, 80, y + 5.5, { align: "right" });
+      doc.text(`${(regHours || 0).toFixed(1)} hrs`, 80, y + 5.5, { align: "right" });
       // OT Hours
-      doc.text(`${otHours.toFixed(1)} hrs`, 102, y + 5.5, { align: "right" });
+      doc.text(`${(otHours || 0).toFixed(1)} hrs`, 102, y + 5.5, { align: "right" });
       // Basic Pay
       doc.text(`PHP ${(pr.basicSalary || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`, 132, y + 5.5, { align: "right" });
       // OT Pay
@@ -2927,8 +2927,8 @@ Official electronic payroll notification. Printable payslip statement is accessi
     doc.setFont("helvetica", "bold");
     doc.setTextColor(15, 23, 42);
     doc.text("TOTAL DISBURSEMENTS", 18, y + 6.5);
-    doc.text(`${grandRegHours.toFixed(1)}h`, 80, y + 6.5, { align: "right" });
-    doc.text(`${grandOtHours.toFixed(1)}h`, 102, y + 6.5, { align: "right" });
+    doc.text(`${(grandRegHours || 0).toFixed(1)}h`, 80, y + 6.5, { align: "right" });
+    doc.text(`${(grandOtHours || 0).toFixed(1)}h`, 102, y + 6.5, { align: "right" });
     doc.text(`PHP ${grandBasic.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, 132, y + 6.5, { align: "right" });
     doc.text(`PHP ${grandOtPay.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, 160, y + 6.5, { align: "right" });
     doc.text(`PHP ${grandBenefits.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, 188, y + 6.5, { align: "right" });
@@ -3823,7 +3823,7 @@ Official electronic payroll notification. Printable payslip statement is accessi
                             <div className="flex justify-between text-[9px] font-mono text-zinc-400">
                               <span>Log Completeness:</span>
                               <span className="font-bold text-zinc-600 dark:text-zinc-300">
-                                {item.totalEffectiveHours.toFixed(1)}h / {item.expectedHours}h
+                                {(item?.totalEffectiveHours ?? 0).toFixed(1)}h / {item?.expectedHours ?? 0}h
                               </span>
                             </div>
                             <div className="w-full bg-zinc-200 dark:bg-zinc-800 h-1 rounded-full overflow-hidden">
@@ -3869,7 +3869,7 @@ Official electronic payroll notification. Printable payslip statement is accessi
 
                           {item.hasShortfall && !item.hasAbsences && (
                             <span className="px-2 py-0.5 text-[9px] font-bold font-mono rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400">
-                              Hours Shortfall: -{(item.hoursDiscrepancy).toFixed(1)}h
+                              Hours Shortfall: -{((item?.hoursDiscrepancy ?? 0)).toFixed(1)}h
                             </span>
                           )}
                         </div>
@@ -5148,8 +5148,8 @@ Official electronic payroll notification. Printable payslip statement is accessi
                           )}
                         </td>
                         <td className="py-2.5 px-3 text-center font-mono">
-                          {m.totalHours > 0 ? (
-                            <span className="text-indigo-600 dark:text-indigo-400 font-bold">{m.totalHours.toFixed(1)}h</span>
+                          {(m?.totalHours ?? 0) > 0 ? (
+                            <span className="text-indigo-600 dark:text-indigo-400 font-bold">{(m.totalHours ?? 0).toFixed(1)}h</span>
                           ) : (
                             <span className="text-zinc-400">0h</span>
                           )}

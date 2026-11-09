@@ -1044,9 +1044,9 @@ export default function AdminDashboard({
       return {
         ...emp,
         shiftsCount: shiftsCompleted,
-        totalWorkedHours: parseFloat(totalWorkedHours.toFixed(2)),
-        totalOtHours: parseFloat(totalOtHours.toFixed(2)),
-        estimatedOtPay: parseFloat(calculatedPay.toFixed(2)),
+        totalWorkedHours: parseFloat((totalWorkedHours || 0).toFixed(2)),
+        totalOtHours: parseFloat((totalOtHours || 0).toFixed(2)),
+        estimatedOtPay: parseFloat((calculatedPay || 0).toFixed(2)),
         logs: logsInRange
       };
     });
@@ -1086,12 +1086,12 @@ export default function AdminDashboard({
     });
 
     return {
-      grandTotalOtHours: parseFloat(grandTotalOtHours.toFixed(2)),
-      grandTotalOtPay: parseFloat(grandTotalOtPay.toFixed(2)),
+      grandTotalOtHours: parseFloat((grandTotalOtHours || 0).toFixed(2)),
+      grandTotalOtPay: parseFloat((grandTotalOtPay || 0).toFixed(2)),
       staffWithOvertimeCount,
-      maximumOtHours: parseFloat(maximumOtHours.toFixed(2)),
+      maximumOtHours: parseFloat((maximumOtHours || 0).toFixed(2)),
       maximumOtEmployeeName,
-      highestSingleOtHours: parseFloat(maximumOtHours.toFixed(2)),
+      highestSingleOtHours: parseFloat((maximumOtHours || 0).toFixed(2)),
       highestOtEmployeeName: maximumOtEmployeeName
     };
   }, [filteredOtSummary]);
@@ -1430,19 +1430,19 @@ export default function AdminDashboard({
             </div>
           )}
 
-          {/* High-Impact Modern KPI Cards Grid */}
+          {/* High-Impact Modern KPI Cards Grid (Modern Pastel & High-Contrast Aesthetic) */}
           <section className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3.5 sm:gap-4">
             {/* Total Staff */}
-            <div className="p-4 sm:p-5 bg-white dark:bg-slate-900/90 border border-slate-200/90 dark:border-white/10 rounded-2xl flex flex-col justify-between shadow-xs hover:shadow-md transition-shadow">
+            <div className="p-5 bg-gradient-to-br from-indigo-50/70 via-white to-indigo-50/30 dark:from-slate-900/95 dark:to-indigo-950/20 border border-indigo-100 dark:border-white/10 rounded-3xl flex flex-col justify-between shadow-xs hover:shadow-md transition-all">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 font-mono uppercase tracking-wider">Total Staff</span>
-                <div className="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-500/15 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
-                  <Users className="w-4 h-4" />
+                <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400 font-mono uppercase tracking-wider">Total Staff</span>
+                <div className="w-9 h-9 rounded-2xl bg-indigo-100 dark:bg-indigo-500/20 flex items-center justify-center text-indigo-700 dark:text-indigo-300 shadow-xs">
+                  <Users className="w-4.5 h-4.5" />
                 </div>
               </div>
-              <div className="mt-3">
-                <p className="text-3xl font-extrabold text-slate-900 dark:text-white tabular-nums tracking-tight">{totalEmployees}</p>
-                <div className="mt-2 flex items-center gap-1.5 text-[11px] text-emerald-600 dark:text-emerald-400 font-mono font-bold">
+              <div className="mt-4">
+                <p className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white tabular-nums tracking-tight">{totalEmployees}</p>
+                <div className="mt-2.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100/80 dark:bg-emerald-950/50 border border-emerald-200/60 dark:border-emerald-800/40 text-[11px] text-emerald-800 dark:text-emerald-300 font-mono font-bold">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                   <span>{activeEmployees.length} Active Artists</span>
                 </div>
@@ -1450,70 +1450,70 @@ export default function AdminDashboard({
             </div>
 
             {/* Present Today */}
-            <div className="p-4 sm:p-5 bg-white dark:bg-slate-900/90 border border-slate-200/90 dark:border-white/10 rounded-2xl flex flex-col justify-between shadow-xs hover:shadow-md transition-shadow">
+            <div className="p-5 bg-gradient-to-br from-emerald-50/70 via-white to-emerald-50/30 dark:from-slate-900/95 dark:to-emerald-950/20 border border-emerald-100 dark:border-white/10 rounded-3xl flex flex-col justify-between shadow-xs hover:shadow-md transition-all">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 font-mono uppercase tracking-wider">On Shift</span>
-                <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-500/15 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
-                  <CheckCircle className="w-4 h-4" />
+                <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400 font-mono uppercase tracking-wider">On Shift</span>
+                <div className="w-9 h-9 rounded-2xl bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center text-emerald-700 dark:text-emerald-300 shadow-xs">
+                  <CheckCircle className="w-4.5 h-4.5" />
                 </div>
               </div>
-              <div className="mt-3">
-                <p className="text-3xl font-extrabold text-slate-900 dark:text-white tabular-nums tracking-tight">{presentCount}</p>
-                <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400 font-mono">
-                  {onBreakCount > 0 ? `${onBreakCount} on break · ` : ""}{lateCount} late today
+              <div className="mt-4">
+                <p className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white tabular-nums tracking-tight">{presentCount}</p>
+                <div className="mt-2.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100/80 dark:bg-emerald-950/50 border border-emerald-200/60 dark:border-emerald-800/40 text-[11px] text-emerald-800 dark:text-emerald-300 font-mono font-bold">
+                  <span>{onBreakCount > 0 ? `${onBreakCount} break · ` : ""}{lateCount} late</span>
                 </div>
               </div>
             </div>
 
             {/* Absent Today */}
-            <div className="p-4 sm:p-5 bg-white dark:bg-slate-900/90 border border-slate-200/90 dark:border-white/10 rounded-2xl flex flex-col justify-between shadow-xs hover:shadow-md transition-shadow">
+            <div className="p-5 bg-gradient-to-br from-rose-50/70 via-white to-rose-50/30 dark:from-slate-900/95 dark:to-rose-950/20 border border-rose-100 dark:border-white/10 rounded-3xl flex flex-col justify-between shadow-xs hover:shadow-md transition-all">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 font-mono uppercase tracking-wider">Offline / Off</span>
-                <div className="w-8 h-8 rounded-xl bg-rose-50 dark:bg-rose-500/15 flex items-center justify-center text-rose-600 dark:text-rose-400">
-                  <AlertCircle className="w-4 h-4" />
+                <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400 font-mono uppercase tracking-wider">Offline / Off</span>
+                <div className="w-9 h-9 rounded-2xl bg-rose-100 dark:bg-rose-500/20 flex items-center justify-center text-rose-700 dark:text-rose-300 shadow-xs">
+                  <AlertCircle className="w-4.5 h-4.5" />
                 </div>
               </div>
-              <div className="mt-3">
-                <p className="text-3xl font-extrabold text-slate-900 dark:text-white tabular-nums tracking-tight">{absentCount}</p>
-                <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400 font-mono">
-                  {unloggedCount > 0 ? `${unloggedCount} not signed in` : "All logged in"}
+              <div className="mt-4">
+                <p className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white tabular-nums tracking-tight">{absentCount}</p>
+                <div className="mt-2.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-[11px] text-slate-700 dark:text-slate-300 font-mono font-medium">
+                  <span>{unloggedCount > 0 ? `${unloggedCount} not signed in` : "All logged in"}</span>
                 </div>
               </div>
             </div>
 
             {/* Pending Requests */}
             <div 
-              className="p-4 sm:p-5 bg-white dark:bg-slate-900/90 border border-slate-200/90 dark:border-white/10 rounded-2xl flex flex-col justify-between shadow-xs hover:shadow-md hover:border-amber-400/50 dark:hover:border-amber-400/40 transition-all cursor-pointer group" 
+              className="p-5 bg-gradient-to-br from-amber-50/80 via-white to-amber-50/30 dark:from-slate-900/95 dark:to-amber-950/20 border border-amber-200/80 dark:border-white/10 rounded-3xl flex flex-col justify-between shadow-xs hover:shadow-md hover:border-amber-400/50 dark:hover:border-amber-400/40 transition-all cursor-pointer group" 
               onClick={() => setActiveSubTab("pending_tasks")}
               id="pending_requests_card"
             >
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 font-mono uppercase tracking-wider">Pending HR</span>
-                <div className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-500/15 flex items-center justify-center text-amber-600 dark:text-amber-400 group-hover:scale-105 transition-transform">
-                  <TrendingUp className="w-4 h-4" />
+                <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400 font-mono uppercase tracking-wider">Pending HR</span>
+                <div className="w-9 h-9 rounded-2xl bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center text-amber-700 dark:text-amber-300 group-hover:scale-105 transition-transform shadow-xs">
+                  <TrendingUp className="w-4.5 h-4.5" />
                 </div>
               </div>
-              <div className="mt-3">
-                <p className="text-3xl font-extrabold text-slate-900 dark:text-white tabular-nums tracking-tight">{pendingRequestsCount}</p>
-                <div className="mt-2 flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-400 font-mono font-bold">
-                  <span>Requires Action</span>
+              <div className="mt-4">
+                <p className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white tabular-nums tracking-tight">{pendingRequestsCount}</p>
+                <div className="mt-2.5 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900 text-white dark:bg-amber-400 dark:text-slate-950 text-[11px] font-mono font-black shadow-xs group-hover:bg-indigo-600 transition-colors">
+                  <span>Review Tasks</span>
                   <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
                 </div>
               </div>
             </div>
 
             {/* Upcoming Birthdays count */}
-            <div className="p-4 sm:p-5 bg-white dark:bg-slate-900/90 border border-slate-200/90 dark:border-white/10 rounded-2xl flex flex-col justify-between shadow-xs hover:shadow-md transition-shadow col-span-2 sm:col-span-1 md:col-span-4 lg:col-span-1">
+            <div className="p-5 bg-gradient-to-br from-pink-50/70 via-white to-pink-50/30 dark:from-slate-900/95 dark:to-pink-950/20 border border-pink-100 dark:border-white/10 rounded-3xl flex flex-col justify-between shadow-xs hover:shadow-md transition-all col-span-2 sm:col-span-1 md:col-span-4 lg:col-span-1">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 font-mono uppercase tracking-wider">Birthdays</span>
-                <div className="w-8 h-8 rounded-xl bg-pink-50 dark:bg-pink-500/15 flex items-center justify-center text-pink-600 dark:text-pink-400">
-                  <Heart className="w-4 h-4" />
+                <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400 font-mono uppercase tracking-wider">Birthdays</span>
+                <div className="w-9 h-9 rounded-2xl bg-pink-100 dark:bg-pink-500/20 flex items-center justify-center text-pink-700 dark:text-pink-300 shadow-xs">
+                  <Heart className="w-4.5 h-4.5" />
                 </div>
               </div>
-              <div className="mt-3">
-                <p className="text-3xl font-extrabold text-slate-900 dark:text-white tabular-nums tracking-tight">{upcomingBirthdays.length}</p>
-                <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400 font-mono">
-                  {(time instanceof Date && !isNaN(time.getTime()) ? time : new Date()).toLocaleString(undefined, { month: "long" })} Celebrations
+              <div className="mt-4">
+                <p className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white tabular-nums tracking-tight">{upcomingBirthdays.length}</p>
+                <div className="mt-2.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-pink-100/80 dark:bg-pink-950/50 border border-pink-200/60 dark:border-pink-800/40 text-[11px] text-pink-800 dark:text-pink-300 font-mono font-bold">
+                  <span>{(time instanceof Date && !isNaN(time.getTime()) ? time : new Date()).toLocaleString(undefined, { month: "short" })} Parties</span>
                 </div>
               </div>
             </div>

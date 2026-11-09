@@ -828,7 +828,7 @@ export function CashAdvancesManager({ advances, employees, periods, bossDebts = 
                 {debtPayoutMethod === "Split" && (
                   <div>
                     <label className="block text-[10px] font-bold text-zinc-500 font-mono uppercase mb-1">
-                      Number of Cutoff Splits ({debtSplitCount} cutoffs = ₱{(debtAmount / (debtSplitCount || 1)).toFixed(2)} / cutoff)
+                      Number of Cutoff Splits ({debtSplitCount} cutoffs = ₱{(((debtAmount || 0) / (debtSplitCount || 1)) || 0).toFixed(2)} / cutoff)
                     </label>
                     <input 
                       type="number"

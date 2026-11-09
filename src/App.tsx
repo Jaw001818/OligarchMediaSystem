@@ -979,8 +979,8 @@ export default function App() {
                   )}
                 </main>
 
-                {/* Fixed Mobile Bottom Navigation Bar (Thumb-Zone Priority) */}
-                <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-[#0A0D16]/95 backdrop-blur-xl border-t border-slate-200/90 dark:border-white/10 px-2 py-1 shadow-2xl flex items-center justify-around print:hidden">
+                {/* Floating Modern Mobile Bottom Navigation Dock (Inspired by Modern Reference) */}
+                <nav className="md:hidden fixed bottom-3 left-3 right-3 z-40 max-w-md mx-auto bg-slate-950/90 dark:bg-slate-900/95 text-white backdrop-blur-2xl border border-white/15 px-2 py-1.5 rounded-full shadow-2xl flex items-center justify-around print:hidden">
                   {[
                     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
                     { id: "employees", label: "Staff", icon: Users },
@@ -1002,23 +1002,20 @@ export default function App() {
                             setMobileSidebarOpen(false);
                           }
                         }}
-                        className={`flex-1 flex flex-col items-center justify-center py-1.5 px-1 rounded-2xl transition-all relative min-h-[50px] cursor-pointer ${
+                        className={`flex-1 flex flex-col items-center justify-center py-1 px-1 rounded-full transition-all relative min-h-[46px] cursor-pointer ${
                           isActive
-                            ? "text-indigo-600 dark:text-indigo-400 font-bold"
-                            : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 font-medium"
+                            ? "bg-white/20 text-white font-bold shadow-inner"
+                            : "text-slate-400 hover:text-white font-medium"
                         }`}
                       >
-                        <div className={`p-1 rounded-xl transition-colors ${isActive ? "bg-indigo-50 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400" : ""}`}>
-                          <Icon className="w-5 h-5" />
+                        <div className="p-0.5">
+                          <Icon className="w-4.5 h-4.5" />
                         </div>
-                        <span className="text-[10px] tracking-tight mt-0.5 font-sans leading-none">{tab.label}</span>
+                        <span className="text-[9px] tracking-tight mt-0.5 font-sans leading-none">{tab.label}</span>
                         {tab.count !== undefined && tab.count > 0 && (
-                          <span className="absolute top-1 right-2 px-1 py-0.2 rounded-full bg-amber-500 text-slate-950 font-mono font-black text-[9px] min-w-[15px] text-center leading-none">
+                          <span className="absolute top-0.5 right-2 px-1 py-0.2 rounded-full bg-amber-400 text-slate-950 font-mono font-black text-[9px] min-w-[15px] text-center leading-none shadow-xs">
                             {tab.count}
                           </span>
-                        )}
-                        {isActive && (
-                          <span className="w-1 h-1 rounded-full bg-indigo-600 dark:bg-indigo-400 mt-0.5" />
                         )}
                       </button>
                     );
