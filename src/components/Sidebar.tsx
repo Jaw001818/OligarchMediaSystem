@@ -16,7 +16,8 @@ import {
   Moon,
   BookOpen,
   Wallet,
-  Trash2
+  Trash2,
+  MessageSquare
 } from "lucide-react";
 
 interface SidebarProps {
@@ -60,10 +61,11 @@ export default function Sidebar({
       ]
     },
     {
-      title: "COMMUNICATION & SYSTEM",
+      title: "COMMUNICATION & CHANNELS",
       items: [
         { id: "devotion", label: "Devotion & Prayer", icon: BookOpen },
         { id: "requests", label: "Staff Requests", icon: MailWarning, count: pendingRequestsCount },
+        { id: "chat", label: "Studio Chat / Messages", icon: MessageSquare, badge: "Upcoming" },
         { id: "trash", label: "Recycle Bin", icon: Trash2 },
         { id: "settings", label: "System Config", icon: Settings },
       ]
@@ -138,6 +140,11 @@ export default function Sidebar({
                     <IconComponent className={`w-4 h-4 shrink-0 transition-colors ${isActive ? "text-indigo-600 dark:text-indigo-400" : "text-slate-400 dark:text-slate-500"}`} />
                     <span className="truncate whitespace-nowrap">{item.label}</span>
                   </div>
+                  {(item as any).badge && (
+                    <span className="px-1.5 py-0.5 rounded-full bg-gradient-to-r from-indigo-500/10 to-violet-500/10 dark:from-indigo-500/20 dark:to-violet-500/20 text-indigo-600 dark:text-indigo-300 border border-indigo-500/20 text-[9px] font-mono font-bold uppercase tracking-wider shrink-0 ml-1.5">
+                      {(item as any).badge}
+                    </span>
+                  )}
                   {item.count !== undefined && item.count > 0 && (
                     <span className="bg-indigo-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full min-w-[20px] h-[20px] flex items-center justify-center leading-none shadow-sm shadow-indigo-600/30 shrink-0 ml-2">
                       {item.count}

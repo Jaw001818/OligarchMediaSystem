@@ -728,14 +728,14 @@ export default function AttendanceEditor({
       pdf.text("Accumulated Hours:", 115, 65);
       pdf.setFont("helvetica", "normal");
       pdf.setTextColor(14, 165, 233);
-      pdf.text(`${totalWorked.toFixed(2)} hrs`, 155, 65);
+      pdf.text(`${(totalWorked || 0).toFixed(2)} hrs`, 155, 65);
       pdf.setTextColor(15, 23, 42);
 
       pdf.setFont("helvetica", "bold");
       pdf.text("Approved Overtime:", 115, 71);
       pdf.setFont("helvetica", "bold");
       pdf.setTextColor(22, 163, 74);
-      pdf.text(`${totalOvertime.toFixed(2)} hrs`, 155, 71);
+      pdf.text(`${(totalOvertime || 0).toFixed(2)} hrs`, 155, 71);
       pdf.setTextColor(15, 23, 42);
 
       // Grid Headers

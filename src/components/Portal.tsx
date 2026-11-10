@@ -2371,34 +2371,136 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
       )}
 
       {/* Modernized Portal Header */}
-      <header className="mb-6 text-center space-y-3">
-        <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-600 dark:text-indigo-400 text-xs font-mono font-bold tracking-wider uppercase">
-          <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
-          <span>Oligarch Media Graphic Design Studio</span>
-        </div>
+      <header className="mb-6 space-y-4">
+        {verifiedEmployee ? (
+          <div className="p-5 sm:p-6 bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-white/10 rounded-3xl shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5">
+              <div className="relative shrink-0">
+                <img
+                  src={verifiedEmployee.profilePicture || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=120"}
+                  alt={verifiedEmployee.fullName}
+                  referrerPolicy="no-referrer"
+                  className="w-13 h-13 rounded-full object-cover border-2 border-white dark:border-slate-800 shadow-sm"
+                />
+                <span className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full ring-2 ring-white dark:ring-slate-900 ${
+                  todayAttendance?.status === "On Break" 
+                    ? "bg-amber-400" 
+                    : todayAttendance?.status === "Timed Out" 
+                    ? "bg-blue-500" 
+                    : todayAttendance 
+                    ? "bg-emerald-500 animate-pulse" 
+                    : "bg-slate-400"
+                }`} />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+                    Welcome back
+                  </span>
+                  {fetchingAttendance ? (
+                    <span className="text-[10px] text-slate-400 font-mono font-bold animate-pulse">Syncing...</span>
+                  ) : !todayAttendance ? (
+                    <span className="px-2 py-0.5 text-[9px] font-mono font-extrabold uppercase rounded-full bg-slate-200 text-slate-700 dark:bg-white/10 dark:text-slate-300">
+                      Off Duty
+                    </span>
+                  ) : todayAttendance.status === "Birthday Leave" ? (
+                    <span className="px-2 py-0.5 text-[9px] font-mono font-extrabold uppercase rounded-full bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300">
+                      🎂 Birthday Leave
+                    </span>
+                  ) : todayAttendance.status === "On Break" ? (
+                    <span className="px-2 py-0.5 text-[9px] font-mono font-extrabold uppercase rounded-full bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300 animate-pulse">
+                      On Break
+                    </span>
+                  ) : todayAttendance.status === "Timed Out" ? (
+                    <span className="px-2 py-0.5 text-[9px] font-mono font-extrabold uppercase rounded-full bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                      Shift Done
+                    </span>
+                  ) : todayAttendance.status === "Late" && !todayAttendance.isLateExcused ? (
+                    <span className="px-2 py-0.5 text-[9px] font-mono font-extrabold uppercase rounded-full bg-rose-100 text-rose-800 dark:bg-rose-500/20 dark:text-rose-300 animate-pulse">
+                      On Duty (Late)
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 text-[9px] font-mono font-extrabold uppercase rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300">
+                      On Duty
+                    </span>
+                  )}
+                </div>
+                <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight truncate">
+                  Hello, {verifiedEmployee.fullName.split(" ")[0]} 👋
+                </h1>
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5 truncate">
+                  #{verifiedEmployee.employeeNumber} · {verifiedEmployee.position || "Graphic Designer"}
+                </p>
+              </div>
+            </div>
 
-        <div className="flex flex-col items-center">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-sky-400 flex items-center justify-center text-white font-black text-xl shadow-lg ring-4 ring-indigo-500/20 mb-2">
-            OM
+            <div className="flex flex-wrap items-center gap-2 self-stretch sm:self-auto justify-between sm:justify-end">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800/80 border border-slate-200/80 dark:border-white/10 text-xs font-mono">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-slate-500 dark:text-slate-400">PHT:</span>
+                <strong className="text-slate-900 dark:text-white tabular-nums">{currentTime.toLocaleTimeString()}</strong>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsChangingPin(!isChangingPin);
+                  setPinChangeError("");
+                  setPinChangeSuccess("");
+                }}
+                className={`px-3 py-1.5 rounded-full border text-xs font-bold font-mono transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs ${
+                  isChangingPin 
+                    ? "bg-indigo-600 text-white border-indigo-600" 
+                    : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-slate-700"
+                }`}
+              >
+                <Lock className="w-3 h-3" />
+                <span>{isChangingPin ? "Cancel PIN" : "Change PIN"}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setVerifiedEmployee(null);
+                  setEmployeeNum("");
+                  setActivePortalTab("timetracking");
+                }}
+                className="px-3 py-1.5 rounded-full bg-slate-900 text-white dark:bg-white dark:text-slate-900 hover:opacity-90 transition-opacity text-xs font-bold font-mono cursor-pointer shadow-xs"
+              >
+                Sign Out
+              </button>
+            </div>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-            Employee Operations Hub
-          </h1>
-          <p className="text-slate-500 dark:text-slate-400 text-xs sm:text-sm mt-1 max-w-md mx-auto">
-            Night Shift (10:00 PM – 7:00 AM PHT) • Live punch clock, devotion roster, and official leave vouchers.
-          </p>
-        </div>
+        ) : (
+          <div className="text-center space-y-3">
+            <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-600 dark:text-indigo-400 text-xs font-mono font-bold tracking-wider uppercase">
+              <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+              <span>Oligarch Media Graphic Design Studio</span>
+            </div>
 
-        {/* Live Manila Time Pill */}
-        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200/80 dark:border-white/10 text-xs font-mono">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="text-slate-500 dark:text-slate-400">Manila Time:</span>
-          <strong className="text-slate-900 dark:text-white tabular-nums">{currentTime.toLocaleTimeString()}</strong>
-        </div>
+            <div className="flex flex-col items-center">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-sky-400 flex items-center justify-center text-white font-black text-xl shadow-lg ring-4 ring-indigo-500/20 mb-2">
+                OM
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+                Employee Operations Hub
+              </h1>
+              <p className="text-slate-500 dark:text-slate-400 text-xs sm:text-sm mt-1 max-w-md mx-auto">
+                Night Shift (10:00 PM – 7:00 AM PHT) • Live punch clock, devotion roster, and official leave vouchers.
+              </p>
+            </div>
+
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200/80 dark:border-white/10 text-xs font-mono">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-slate-500 dark:text-slate-400">Manila Time:</span>
+              <strong className="text-slate-900 dark:text-white tabular-nums">{currentTime.toLocaleTimeString()}</strong>
+            </div>
+          </div>
+        )}
       </header>
 
       {/* Modern Segmented Navigation Tabs */}
-      <div className={`grid ${verifiedEmployee ? "grid-cols-2 sm:grid-cols-3 md:flex md:flex-wrap" : "grid-cols-3 md:flex md:flex-wrap"} border border-slate-200/80 dark:border-white/10 mb-8 max-w-2xl mx-auto justify-center bg-slate-100 dark:bg-slate-900 p-1.5 rounded-2xl shadow-inner gap-1.5`}>
+      <div className={`${verifiedEmployee ? "hidden md:flex md:flex-wrap" : "grid grid-cols-3 md:flex md:flex-wrap"} border border-slate-200/80 dark:border-white/10 mb-8 max-w-2xl mx-auto justify-center bg-slate-100 dark:bg-slate-900 p-1.5 rounded-2xl shadow-inner gap-1.5`}>
         {!verifiedEmployee ? (
           <>
             <button
@@ -2549,7 +2651,7 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
       </div>
 
       {/* Main Container Card */}
-      <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 md:p-8 shadow-sm transition-colors duration-200">
+      <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-5 sm:p-6 md:p-8 pb-28 md:pb-8 shadow-sm transition-colors duration-200">
 
 
         {/* TAB 1: FORM REPORT SUBMISSION */}
@@ -4109,79 +4211,6 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
             ) : (
               /* Phase B: Verified Employee Time Tracker Interface */
               <div className="max-w-xl mx-auto space-y-6" id="portal_time_tracking_verified_panel">
-                {/* Employee Welcome Banner */}
-                <div className="p-5 bg-zinc-50 dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="flex items-center gap-4">
-                    <img 
-                      src={verifiedEmployee.profilePicture || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=120"} 
-                      alt="avatar" 
-                      referrerPolicy="no-referrer"
-                      className="w-12 h-12 rounded-full object-cover border border-zinc-200 dark:border-zinc-700 shadow-sm shrink-0"
-                    />
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-bold text-zinc-800 dark:text-zinc-150 text-base">{verifiedEmployee.fullName}</h3>
-                        {fetchingAttendance ? (
-                          <span className="text-[10px] text-zinc-400 font-mono font-bold animate-pulse uppercase">Syncing...</span>
-                        ) : !todayAttendance ? (
-                          <span className="px-2.5 py-1 text-[10px] font-mono font-bold uppercase rounded bg-red-50 text-red-650 dark:bg-red-955/20 dark:text-red-400 border border-red-100 dark:border-red-900/25">
-                            Off Duty
-                          </span>
-                        ) : todayAttendance.status === "Birthday Leave" ? (
-                          <span className="px-2.5 py-1 text-[10px] font-mono font-bold uppercase rounded bg-pink-50 text-pink-600 dark:bg-pink-955/20 dark:text-pink-400 border border-pink-200 dark:border-pink-800/40">
-                            🎂 Birthday Leave (Approved)
-                          </span>
-                        ) : todayAttendance.status === "Paid Leave" || todayAttendance.status?.toLowerCase().includes("leave") ? (
-                          <span className="px-2.5 py-1 text-[10px] font-mono font-bold uppercase rounded bg-purple-50 text-purple-600 dark:bg-purple-955/20 dark:text-purple-400 border border-purple-200 dark:border-purple-800/40">
-                            Approved Leave ({todayAttendance.status})
-                          </span>
-                        ) : todayAttendance.status === "Late" && !todayAttendance.isLateExcused ? (
-                          <span className="px-2.5 py-1 text-[10px] font-mono font-bold uppercase rounded bg-rose-50 text-rose-650 dark:bg-rose-955/20 dark:text-rose-400 border border-rose-100 dark:border-rose-900/25 animate-pulse">
-                            On Duty (Late)
-                          </span>
-                        ) : todayAttendance.status === "Present" || (todayAttendance.status === "Late" && todayAttendance.isLateExcused) ? (
-                          <span className="px-2.5 py-1 text-[10px] font-mono font-bold uppercase rounded bg-emerald-50 text-emerald-650 dark:bg-emerald-955/20 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/25">
-                            On Duty
-                          </span>
-                        ) : todayAttendance.status === "On Break" ? (
-                          <span className="px-2.5 py-1 text-[10px] font-mono font-bold uppercase rounded bg-amber-50 text-amber-650 dark:bg-amber-955/20 dark:text-amber-400 border border-amber-100 dark:border-amber-900/25 animate-pulse">
-                            On Break
-                          </span>
-                        ) : (
-                          <span className="px-2.5 py-1 text-[10px] font-mono font-bold uppercase rounded bg-zinc-100 text-zinc-650 dark:bg-zinc-800 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700">
-                            Shift Done
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-zinc-500 font-mono uppercase tracking-wider">{verifiedEmployee.position} • {verifiedEmployee.department}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col sm:items-end gap-2 shrink-0">
-                    <button
-                      onClick={() => {
-                        setIsChangingPin(!isChangingPin);
-                        setPinChangeError("");
-                        setPinChangeSuccess("");
-                      }}
-                      className="text-xs font-bold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1 justify-start sm:justify-end cursor-pointer"
-                    >
-                      <Lock className="w-3 h-3" />
-                      {isChangingPin ? "Cancel Change PIN" : "Change 4-Digit PIN"}
-                    </button>
-                    <button
-                      onClick={() => {
-                        setVerifiedEmployee(null);
-                        setEmployeeNum("");
-                        setActivePortalTab("timetracking");
-                      }}
-                      className="text-xs font-bold text-red-600 hover:text-red-700 dark:text-red-455 dark:hover:text-red-350 underline text-left cursor-pointer"
-                    >
-                      Logout
-                    </button>
-                  </div>
-                </div>
-
                 {isChangingPin && (
                   <form onSubmit={handleChangePin} className="max-w-md mx-auto p-5 bg-blue-50/40 dark:bg-zinc-900/40 border border-blue-100 dark:border-blue-900/30 rounded-2xl mb-2 space-y-4 animate-fadeIn">
                     <div className="text-center pb-2 border-b border-blue-100/50 dark:border-blue-900/20">
@@ -4466,124 +4495,195 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
                     })()}
                   </div>
 
-                {/* Live Real-Time Punch Control Center */}
+                {/* Quick Punch Controls (Time In & Time Out) */}
                 <div className="space-y-3">
                   <div className="flex items-center justify-between px-1 text-[11px] font-mono">
-                    <span className="flex items-center gap-1.5 font-bold text-zinc-400">
-                      <span className={`w-2 h-2 rounded-full ${todayAttendance ? (todayAttendance.status === "Timed Out" ? "bg-blue-400" : "bg-emerald-400 animate-ping") : "bg-zinc-500"}`} />
-                      {todayAttendance ? (todayAttendance.status === "Timed Out" ? "Shift Concluded" : "Shift In Progress (Live Sync)") : "Terminal Ready • One-Tap Punch"}
+                    <span className="font-bold text-slate-500 dark:text-slate-400">
+                      Quick Punch Controls
                     </span>
-                    <span className="text-zinc-500 text-[10px]">
-                      Instant Cloud Logging (No OK prompt)
+                    <span className="text-slate-400 dark:text-slate-500 text-[10px]">
+                      Instant Cloud Sync
                     </span>
                   </div>
 
-                  {/* Action Buttons Grid */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                     {/* BUTTON 1: TIME IN */}
-                    <button
-                      type="button"
-                      onClick={handlePortalTimeIn}
-                      disabled={!!todayAttendance || isSubmittingPunch}
-                      className={`relative p-5 rounded-2xl font-black font-sans text-xs uppercase tracking-wider transition-all duration-200 flex flex-col items-center justify-center gap-2 border shadow-lg ${
-                        !todayAttendance
-                          ? "bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white border-emerald-400/40 shadow-emerald-950/50 hover:scale-[1.02] active:scale-[0.98] cursor-pointer ring-1 ring-emerald-400/30"
-                          : "bg-slate-100 dark:bg-zinc-900/60 text-slate-400 dark:text-zinc-500 border-slate-200 dark:border-zinc-800/80 opacity-70 cursor-not-allowed"
-                      }`}
-                    >
-                      {isSubmittingPunch && !todayAttendance ? (
-                        <>
-                          <RefreshCw className="w-6 h-6 animate-spin text-emerald-300" />
-                          <span className="font-mono text-[11px]">Recording Punch...</span>
-                        </>
-                      ) : (
-                        <>
-                          <div className="flex items-center gap-2">
-                            <LogIn className="w-5 h-5 text-emerald-500 dark:text-emerald-300" />
-                            <span className="text-sm font-black">
-                              {todayAttendance?.status === "Birthday Leave"
-                                ? "🎂 Birthday Leave (8h Paid)"
-                                : todayAttendance?.status === "Paid Leave" || todayAttendance?.status?.toLowerCase().includes("leave")
-                                  ? `🌴 ${todayAttendance.status} (8h Paid)`
-                                  : "Time In"}
-                            </span>
-                          </div>
-                          <span className="text-[10px] font-mono font-normal opacity-80 normal-case tracking-normal">
-                            {!todayAttendance ? "Tap to record shift start accurately" : `Logged: ${todayAttendance.timeIn ? formatTo12Hour(todayAttendance.timeIn) : "Active"}`}
+                    {!todayAttendance || !todayAttendance.timeIn ? (
+                      /* ACTIVE: Ready to Time In (Highlighted Green) */
+                      <button
+                        type="button"
+                        onClick={handlePortalTimeIn}
+                        disabled={isSubmittingPunch}
+                        className="relative p-5 rounded-3xl font-bold text-xs transition-all duration-200 flex flex-col items-center justify-center gap-2.5 border bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-600/20 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                      >
+                        <div className="w-12 h-12 rounded-2xl bg-white/20 text-white flex items-center justify-center shadow-inner">
+                          {isSubmittingPunch ? (
+                            <RefreshCw className="w-6 h-6 animate-spin" />
+                          ) : (
+                            <LogIn className="w-6 h-6" />
+                          )}
+                        </div>
+                        <div className="text-center">
+                          <span className="text-base font-black block">Time In</span>
+                          <span className="text-[11px] font-mono opacity-90 block mt-0.5">
+                            Start Night Shift (10:00 PM)
                           </span>
-                        </>
-                      )}
-                    </button>
+                        </div>
+                      </button>
+                    ) : (
+                      /* COMPLETED: Already Timed In (Neutral calm settled state, not highlighted green) */
+                      <div className="p-5 rounded-3xl font-bold text-xs flex flex-col items-center justify-center gap-2.5 border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-900/70 text-slate-700 dark:text-slate-300 cursor-default shadow-xs">
+                        <div className="w-12 h-12 rounded-2xl bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center">
+                          <CheckCircle className="w-6 h-6 text-slate-500 dark:text-slate-400" />
+                        </div>
+                        <div className="text-center">
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-200/80 dark:bg-slate-800 text-[10px] font-mono font-bold text-slate-600 dark:text-slate-300 mb-1">
+                            <span>Clocked In</span>
+                            <span>✓</span>
+                          </div>
+                          <span className="text-xs font-mono text-slate-500 dark:text-slate-400 block">
+                            In: {formatTo12Hour(todayAttendance.timeIn)}
+                          </span>
+                        </div>
+                      </div>
+                    )}
 
                     {/* BUTTON 2: TIME OUT */}
-                    <button
-                      type="button"
-                      onClick={handlePortalTimeOut}
-                      disabled={!todayAttendance || todayAttendance.status === "Timed Out" || Boolean(todayAttendance.timeOut) || todayAttendance.status === "On Break" || isSubmittingPunch}
-                      className={`relative p-5 rounded-2xl font-black font-sans text-xs uppercase tracking-wider transition-all duration-200 flex flex-col items-center justify-center gap-2 border shadow-lg ${
-                        todayAttendance && todayAttendance.status !== "Timed Out" && !todayAttendance.timeOut && todayAttendance.status !== "On Break"
-                          ? "bg-gradient-to-r from-rose-600 via-rose-500 to-red-600 hover:from-rose-500 hover:to-red-500 text-white border-rose-400/40 shadow-rose-950/50 hover:scale-[1.02] active:scale-[0.98] cursor-pointer ring-1 ring-rose-400/30"
-                          : "bg-slate-100 dark:bg-zinc-900/60 text-slate-400 dark:text-zinc-500 border-slate-200 dark:border-zinc-800/80 opacity-60 cursor-not-allowed"
-                      }`}
-                    >
-                      {isSubmittingPunch && todayAttendance && todayAttendance.status !== "Timed Out" && !todayAttendance.timeOut ? (
-                        <>
-                          <RefreshCw className="w-6 h-6 animate-spin text-rose-300" />
-                          <span className="font-mono text-[11px]">Recording Punch...</span>
-                        </>
-                      ) : (
-                        <>
-                          <div className="flex items-center gap-2">
-                            <LogOut className="w-5 h-5 text-rose-300" />
-                            <span className="text-sm font-black">Time Out</span>
-                          </div>
-                          <span className="text-[10px] font-mono font-normal opacity-80 normal-case tracking-normal">
-                            {todayAttendance && (todayAttendance.status === "Timed Out" || todayAttendance.timeOut)
-                              ? `Logged: ${todayAttendance.timeOut ? formatTo12Hour(todayAttendance.timeOut) : "Completed"}`
-                              : todayAttendance && todayAttendance.status !== "On Break"
-                              ? "Tap to record shift end accurately"
-                              : "Requires active Clock-In"}
+                    {todayAttendance?.timeIn && !todayAttendance.timeOut ? (
+                      /* ACTIVE: User is Timed In -> Time Out auto-turns VIBRANT RED! */
+                      <button
+                        type="button"
+                        onClick={handlePortalTimeOut}
+                        disabled={isSubmittingPunch}
+                        className="relative p-5 rounded-3xl font-bold text-xs transition-all duration-200 flex flex-col items-center justify-center gap-2.5 border bg-rose-600 hover:bg-rose-500 text-white border-rose-500 shadow-md shadow-rose-600/30 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                      >
+                        <div className="w-12 h-12 rounded-2xl bg-white/20 text-white flex items-center justify-center shadow-inner">
+                          {isSubmittingPunch ? (
+                            <RefreshCw className="w-6 h-6 animate-spin" />
+                          ) : (
+                            <LogOut className="w-6 h-6" />
+                          )}
+                        </div>
+                        <div className="text-center">
+                          <span className="text-base font-black block">Time Out</span>
+                          <span className="text-[11px] font-mono opacity-90 block mt-0.5">
+                            Tap to End Shift (7:00 AM)
                           </span>
-                        </>
-                      )}
-                    </button>
+                        </div>
+                      </button>
+                    ) : todayAttendance?.timeOut ? (
+                      /* COMPLETED: User already timed out */
+                      <div className="p-5 rounded-3xl font-bold text-xs flex flex-col items-center justify-center gap-2.5 border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-900/70 text-slate-700 dark:text-slate-300 cursor-default shadow-xs">
+                        <div className="w-12 h-12 rounded-2xl bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center">
+                          <CheckCircle className="w-6 h-6 text-slate-500 dark:text-slate-400" />
+                        </div>
+                        <div className="text-center">
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-200/80 dark:bg-slate-800 text-[10px] font-mono font-bold text-slate-600 dark:text-slate-300 mb-1">
+                            <span>Shift Completed</span>
+                            <span>✓</span>
+                          </div>
+                          <span className="text-xs font-mono text-slate-500 dark:text-slate-400 block">
+                            Out: {formatTo12Hour(todayAttendance.timeOut)}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      /* DISABLED: User has not timed in yet */
+                      <div className="p-5 rounded-3xl font-bold text-xs flex flex-col items-center justify-center gap-2.5 border border-slate-200 dark:border-white/5 bg-slate-100/70 dark:bg-slate-900/30 text-slate-400 dark:text-slate-600 opacity-60 cursor-not-allowed">
+                        <div className="w-12 h-12 rounded-2xl bg-slate-200/60 dark:bg-slate-800/60 text-slate-400 dark:text-slate-600 flex items-center justify-center">
+                          <LogOut className="w-6 h-6" />
+                        </div>
+                        <div className="text-center">
+                          <span className="text-sm font-black block">Time Out</span>
+                          <span className="text-[10px] font-mono block mt-0.5">
+                            Disabled until Timed In
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                {/* Attendance Summary and Logs */}
+                {/* 3. Today's Activity Timeline List (Reference 2 & 3 style) */}
                 {todayAttendance && (
-                  <div className="p-5 border border-zinc-200 dark:border-zinc-800/85 bg-zinc-50/50 dark:bg-zinc-900/20 rounded-2xl space-y-4">
-                    <h4 className="text-xs font-bold font-mono text-zinc-450 dark:text-zinc-400 uppercase tracking-widest border-b border-zinc-200 dark:border-zinc-800 pb-2">
-                      Today's Log Timeline
-                    </h4>
-                    <div className="grid grid-cols-2 gap-4 text-center">
-                      <div className="p-3 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-150 dark:border-zinc-800">
-                        <p className="text-[9px] font-mono text-zinc-400 uppercase">Clock In</p>
-                        <p className="text-sm font-bold font-mono text-zinc-850 dark:text-zinc-200 mt-1">
-                          {(() => {
-                            if (!todayAttendance.timeIn) return "--:--:--";
-                            if (todayAttendance.earlyInApproved) return todayAttendance.timeIn;
-                            const parseToSecs = (t) => {
-                              const [h, m, s = 0] = String(t).split(":").map(Number);
-                              return (h || 0) * 3600 + (m || 0) * 60 + (s || 0);
-                            };
-                            const tSecs = parseToSecs(todayAttendance.timeIn);
-                            const empSched = verifiedEmployee ? getEmployeeSchedule(verifiedEmployee, settings) : null;
-                            let sStr = todayAttendance.shiftStart || empSched?.workHourStart || settings?.workHourStart || "21:00";
-                            if (sStr.split(":").length === 2) sStr += ":00";
-                            const sSecs = parseToSecs(sStr);
-                            if (tSecs < sSecs && (sSecs - tSecs) < 12 * 3600) {
-                              return sStr;
-                            }
-                            return todayAttendance.timeIn;
-                          })()}
-                        </p>
+                  <div className="p-5 sm:p-6 border border-slate-200/80 dark:border-white/10 bg-slate-50/50 dark:bg-slate-900/40 rounded-3xl space-y-3.5">
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-200/80 dark:border-white/10">
+                      <h4 className="text-xs font-bold font-mono text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                        Today's Shift Activity & Timeline
+                      </h4>
+                      <span className="text-[10px] font-mono text-slate-400 font-semibold">
+                        {currentTime.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })}
+                      </span>
+                    </div>
+
+                    <div className="space-y-2.5">
+                      {/* Event 1: Clock In */}
+                      <div className="p-3.5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/70 dark:border-white/5 flex items-center justify-between shadow-xs">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold">
+                            <LogIn className="w-4.5 h-4.5" />
+                          </div>
+                          <div>
+                            <p className="text-xs font-bold text-slate-900 dark:text-white">Shift Check-In</p>
+                            <p className="text-[10px] text-slate-400 font-mono mt-0.5">
+                              Scheduled: {formatTo12Hour(settings?.workHourStart || "22:00")} PHT
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-xs font-black font-mono text-slate-900 dark:text-white block">
+                            {todayAttendance.timeIn ? formatTo12Hour(todayAttendance.timeIn) : "--:--"}
+                          </span>
+                          <span className="text-[10px] font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                            {todayAttendance.lateMinutes > 0 ? `Late ${todayAttendance.lateMinutes}m` : "On Time"}
+                          </span>
+                        </div>
                       </div>
-                      <div className="p-3 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-150 dark:border-zinc-800">
-                        <p className="text-[9px] font-mono text-zinc-400 uppercase">Clock Out</p>
-                        <p className="text-sm font-bold font-mono text-zinc-850 dark:text-zinc-200 mt-1">
-                          {todayAttendance.timeOut || "--:--:--"}
-                        </p>
+
+                      {/* Event 2: Meal Break */}
+                      <div className="p-3.5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/70 dark:border-white/5 flex items-center justify-between shadow-xs">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-2xl bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold">
+                            <Coffee className="w-4.5 h-4.5" />
+                          </div>
+                          <div>
+                            <p className="text-xs font-bold text-slate-900 dark:text-white">Meal & Rest Break</p>
+                            <p className="text-[10px] text-slate-400 font-mono mt-0.5">
+                              Standard: 60 minutes allocated
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-xs font-black font-mono text-slate-900 dark:text-white block">
+                            {todayAttendance.breakStart ? formatTo12Hour(todayAttendance.breakStart) : "Automatic / Pending"}
+                          </span>
+                          <span className="text-[10px] font-mono font-bold text-amber-600 dark:text-amber-400">
+                            {todayAttendance.status === "On Break" ? "Active Now" : "60m Deducted"}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Event 3: Clock Out */}
+                      <div className="p-3.5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/70 dark:border-white/5 flex items-center justify-between shadow-xs">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-2xl bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 flex items-center justify-center font-bold">
+                            <LogOut className="w-4.5 h-4.5" />
+                          </div>
+                          <div>
+                            <p className="text-xs font-bold text-slate-900 dark:text-white">Shift Check-Out</p>
+                            <p className="text-[10px] text-slate-400 font-mono mt-0.5">
+                              Scheduled: {formatTo12Hour(settings?.workHourEnd || "07:00")} PHT
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-xs font-black font-mono text-slate-900 dark:text-white block">
+                            {todayAttendance.timeOut ? formatTo12Hour(todayAttendance.timeOut) : "In Progress"}
+                          </span>
+                          <span className="text-[10px] font-mono font-bold text-purple-600 dark:text-purple-400">
+                            {(todayAttendance?.otHours || 0) > 0 ? `+${(todayAttendance?.otHours || 0).toFixed(1)}h Overtime` : "Regular Shift"}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -5332,6 +5432,50 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Floating Modern Mobile Bottom Navigation Dock for Employee Portal */}
+      {verifiedEmployee && (
+        <nav className="md:hidden fixed bottom-3 left-3 right-3 z-40 max-w-md mx-auto bg-slate-950/90 dark:bg-slate-900/95 text-white backdrop-blur-2xl border border-white/15 px-2 py-1.5 rounded-full shadow-2xl flex items-center justify-around print:hidden">
+          {[
+            { id: "timetracking", label: "Timecard", icon: Clock },
+            { id: "devotion", label: "Devotion", icon: BookOpen, star: Boolean(assignedDevotionNotice) },
+            { id: "submit", label: "Leaves", icon: FileText },
+            { id: "payslips", label: "Payslips", icon: CreditCard },
+            { id: "notifications", label: "Alerts", icon: Bell, count: employeeNotifications.filter(n => !n.read).length },
+            { id: "bulletins", label: "Bulletins", icon: Megaphone, count: announcements.length }
+          ].map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activePortalTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActivePortalTab(tab.id as any)}
+                className={`flex-1 flex flex-col items-center justify-center py-1 px-0.5 rounded-full transition-all relative min-h-[46px] cursor-pointer ${
+                  isActive
+                    ? "bg-white/20 text-white font-bold shadow-inner"
+                    : "text-slate-400 hover:text-white font-medium"
+                }`}
+              >
+                <div className="p-0.5 relative">
+                  <Icon className="w-4 h-4" />
+                  {tab.star && (
+                    <span className="absolute -top-1 -right-1 text-[8px] text-amber-400 animate-pulse font-bold">
+                      ★
+                    </span>
+                  )}
+                </div>
+                <span className="text-[9px] tracking-tight mt-0.5 font-sans leading-none">{tab.label}</span>
+                {tab.count !== undefined && tab.count > 0 && (
+                  <span className="absolute top-0.5 right-1 px-1 py-0.2 rounded-full bg-rose-500 text-white font-mono font-black text-[8px] min-w-[14px] text-center leading-none shadow-xs">
+                    {tab.count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </nav>
       )}
     </div>
   );

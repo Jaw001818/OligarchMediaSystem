@@ -43,7 +43,13 @@ import {
   Activity,
   Coffee,
   Radio,
-  Zap
+  Zap,
+  BookOpen,
+  Sliders,
+  CreditCard,
+  Wallet,
+  MailWarning,
+  Settings as SettingsIcon
 } from "lucide-react";
 import { 
   BarChart, 
@@ -1430,19 +1436,19 @@ export default function AdminDashboard({
             </div>
           )}
 
-          {/* High-Impact Modern KPI Cards Grid (Modern Pastel & High-Contrast Aesthetic) */}
+          {/* High-Impact Modern KPI Bento Grid (Clean, High-Contrast & Readable) */}
           <section className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3.5 sm:gap-4">
             {/* Total Staff */}
-            <div className="p-5 bg-gradient-to-br from-indigo-50/70 via-white to-indigo-50/30 dark:from-slate-900/95 dark:to-indigo-950/20 border border-indigo-100 dark:border-white/10 rounded-3xl flex flex-col justify-between shadow-xs hover:shadow-md transition-all">
+            <div className="p-5 bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-white/10 border-t-2 border-t-indigo-500 rounded-3xl flex flex-col justify-between shadow-xs hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400 font-mono uppercase tracking-wider">Total Staff</span>
-                <div className="w-9 h-9 rounded-2xl bg-indigo-100 dark:bg-indigo-500/20 flex items-center justify-center text-indigo-700 dark:text-indigo-300 shadow-xs">
-                  <Users className="w-4.5 h-4.5" />
+                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 font-mono uppercase tracking-wider">Total Staff</span>
+                <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 dark:bg-indigo-500/20 ring-1 ring-indigo-500/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shadow-xs">
+                  <Users className="w-5 h-5" />
                 </div>
               </div>
               <div className="mt-4">
                 <p className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white tabular-nums tracking-tight">{totalEmployees}</p>
-                <div className="mt-2.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100/80 dark:bg-emerald-950/50 border border-emerald-200/60 dark:border-emerald-800/40 text-[11px] text-emerald-800 dark:text-emerald-300 font-mono font-bold">
+                <div className="mt-2.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200/60 dark:border-white/5 text-[11px] text-slate-700 dark:text-slate-300 font-mono font-bold">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                   <span>{activeEmployees.length} Active Artists</span>
                 </div>
@@ -1450,27 +1456,27 @@ export default function AdminDashboard({
             </div>
 
             {/* Present Today */}
-            <div className="p-5 bg-gradient-to-br from-emerald-50/70 via-white to-emerald-50/30 dark:from-slate-900/95 dark:to-emerald-950/20 border border-emerald-100 dark:border-white/10 rounded-3xl flex flex-col justify-between shadow-xs hover:shadow-md transition-all">
+            <div className="p-5 bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-white/10 border-t-2 border-t-emerald-500 rounded-3xl flex flex-col justify-between shadow-xs hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400 font-mono uppercase tracking-wider">On Shift</span>
-                <div className="w-9 h-9 rounded-2xl bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center text-emerald-700 dark:text-emerald-300 shadow-xs">
-                  <CheckCircle className="w-4.5 h-4.5" />
+                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 font-mono uppercase tracking-wider">On Shift</span>
+                <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 dark:bg-emerald-500/20 ring-1 ring-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-xs">
+                  <CheckCircle className="w-5 h-5" />
                 </div>
               </div>
               <div className="mt-4">
                 <p className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white tabular-nums tracking-tight">{presentCount}</p>
-                <div className="mt-2.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100/80 dark:bg-emerald-950/50 border border-emerald-200/60 dark:border-emerald-800/40 text-[11px] text-emerald-800 dark:text-emerald-300 font-mono font-bold">
+                <div className="mt-2.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200/60 dark:border-emerald-800/40 text-[11px] text-emerald-700 dark:text-emerald-300 font-mono font-bold">
                   <span>{onBreakCount > 0 ? `${onBreakCount} break · ` : ""}{lateCount} late</span>
                 </div>
               </div>
             </div>
 
             {/* Absent Today */}
-            <div className="p-5 bg-gradient-to-br from-rose-50/70 via-white to-rose-50/30 dark:from-slate-900/95 dark:to-rose-950/20 border border-rose-100 dark:border-white/10 rounded-3xl flex flex-col justify-between shadow-xs hover:shadow-md transition-all">
+            <div className="p-5 bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-white/10 border-t-2 border-t-rose-500 rounded-3xl flex flex-col justify-between shadow-xs hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400 font-mono uppercase tracking-wider">Offline / Off</span>
-                <div className="w-9 h-9 rounded-2xl bg-rose-100 dark:bg-rose-500/20 flex items-center justify-center text-rose-700 dark:text-rose-300 shadow-xs">
-                  <AlertCircle className="w-4.5 h-4.5" />
+                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 font-mono uppercase tracking-wider">Offline / Off</span>
+                <div className="w-10 h-10 rounded-2xl bg-rose-500/10 dark:bg-rose-500/20 ring-1 ring-rose-500/20 flex items-center justify-center text-rose-600 dark:text-rose-400 shadow-xs">
+                  <AlertCircle className="w-5 h-5" />
                 </div>
               </div>
               <div className="mt-4">
@@ -1483,19 +1489,19 @@ export default function AdminDashboard({
 
             {/* Pending Requests */}
             <div 
-              className="p-5 bg-gradient-to-br from-amber-50/80 via-white to-amber-50/30 dark:from-slate-900/95 dark:to-amber-950/20 border border-amber-200/80 dark:border-white/10 rounded-3xl flex flex-col justify-between shadow-xs hover:shadow-md hover:border-amber-400/50 dark:hover:border-amber-400/40 transition-all cursor-pointer group" 
+              className="p-5 bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-white/10 border-t-2 border-t-amber-500 rounded-3xl flex flex-col justify-between shadow-xs hover:shadow-lg hover:-translate-y-1 hover:border-amber-400/50 dark:hover:border-amber-400/40 transition-all duration-300 cursor-pointer group" 
               onClick={() => setActiveSubTab("pending_tasks")}
               id="pending_requests_card"
             >
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400 font-mono uppercase tracking-wider">Pending HR</span>
-                <div className="w-9 h-9 rounded-2xl bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center text-amber-700 dark:text-amber-300 group-hover:scale-105 transition-transform shadow-xs">
-                  <TrendingUp className="w-4.5 h-4.5" />
+                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 font-mono uppercase tracking-wider">Pending HR</span>
+                <div className="w-10 h-10 rounded-2xl bg-amber-500/10 dark:bg-amber-500/20 ring-1 ring-amber-500/20 flex items-center justify-center text-amber-600 dark:text-amber-400 group-hover:scale-105 transition-transform shadow-xs">
+                  <TrendingUp className="w-5 h-5" />
                 </div>
               </div>
               <div className="mt-4">
                 <p className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white tabular-nums tracking-tight">{pendingRequestsCount}</p>
-                <div className="mt-2.5 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900 text-white dark:bg-amber-400 dark:text-slate-950 text-[11px] font-mono font-black shadow-xs group-hover:bg-indigo-600 transition-colors">
+                <div className="mt-2.5 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500 hover:bg-amber-400 text-slate-950 text-[11px] font-mono font-black shadow-xs transition-colors">
                   <span>Review Tasks</span>
                   <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
                 </div>
@@ -1503,16 +1509,16 @@ export default function AdminDashboard({
             </div>
 
             {/* Upcoming Birthdays count */}
-            <div className="p-5 bg-gradient-to-br from-pink-50/70 via-white to-pink-50/30 dark:from-slate-900/95 dark:to-pink-950/20 border border-pink-100 dark:border-white/10 rounded-3xl flex flex-col justify-between shadow-xs hover:shadow-md transition-all col-span-2 sm:col-span-1 md:col-span-4 lg:col-span-1">
+            <div className="p-5 bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-white/10 border-t-2 border-t-pink-500 rounded-3xl flex flex-col justify-between shadow-xs hover:shadow-lg hover:-translate-y-1 transition-all duration-300 col-span-2 sm:col-span-1 md:col-span-4 lg:col-span-1">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400 font-mono uppercase tracking-wider">Birthdays</span>
-                <div className="w-9 h-9 rounded-2xl bg-pink-100 dark:bg-pink-500/20 flex items-center justify-center text-pink-700 dark:text-pink-300 shadow-xs">
-                  <Heart className="w-4.5 h-4.5" />
+                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 font-mono uppercase tracking-wider">Birthdays</span>
+                <div className="w-10 h-10 rounded-2xl bg-pink-500/10 dark:bg-pink-500/20 ring-1 ring-pink-500/20 flex items-center justify-center text-pink-600 dark:text-pink-400 shadow-xs">
+                  <Heart className="w-5 h-5" />
                 </div>
               </div>
               <div className="mt-4">
                 <p className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white tabular-nums tracking-tight">{upcomingBirthdays.length}</p>
-                <div className="mt-2.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-pink-100/80 dark:bg-pink-950/50 border border-pink-200/60 dark:border-pink-800/40 text-[11px] text-pink-800 dark:text-pink-300 font-mono font-bold">
+                <div className="mt-2.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-pink-50 dark:bg-pink-950/50 border border-pink-200/60 dark:border-pink-800/40 text-[11px] text-pink-700 dark:text-pink-300 font-mono font-bold">
                   <span>{(time instanceof Date && !isNaN(time.getTime()) ? time : new Date()).toLocaleString(undefined, { month: "short" })} Parties</span>
                 </div>
               </div>
@@ -1615,7 +1621,15 @@ export default function AdminDashboard({
                   return (
                     <div
                       key={emp.id || emp.employeeNumber}
-                      className="p-3.5 rounded-2xl bg-slate-50/70 dark:bg-slate-950/60 border border-slate-200/80 dark:border-white/5 hover:border-indigo-400/40 transition-all flex flex-col justify-between gap-3 group"
+                      className={`p-4 rounded-3xl border transition-all flex flex-col justify-between gap-3 group shadow-xs hover:shadow-md ${
+                        isOnBreak
+                          ? "bg-amber-50/50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-700/40"
+                          : isPresent
+                          ? "bg-white dark:bg-slate-900 border-slate-200/90 dark:border-white/10 hover:border-emerald-500/40"
+                          : approvedLeave
+                          ? "bg-purple-50/50 dark:bg-purple-950/20 border-purple-200 dark:border-purple-700/40"
+                          : "bg-slate-50/70 dark:bg-slate-900/60 border-slate-200/70 dark:border-white/5 opacity-80"
+                      }`}
                     >
                       <div className="flex items-start justify-between gap-2.5">
                         <div className="flex items-center gap-3 min-w-0">
@@ -1625,7 +1639,7 @@ export default function AdminDashboard({
                               src={emp.profilePicture || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=120"}
                               alt={emp.fullName}
                               referrerPolicy="no-referrer"
-                              className={`w-10 h-10 rounded-full object-cover ring-2 ${
+                              className={`w-11 h-11 rounded-full object-cover ring-2 shadow-xs ${
                                 isOnBreak
                                   ? "ring-amber-400"
                                   : isPresent
@@ -1635,7 +1649,7 @@ export default function AdminDashboard({
                                   : "ring-slate-300 dark:ring-slate-700"
                               }`}
                             />
-                            <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white dark:border-slate-900 ${
+                            <span className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white dark:border-slate-900 ${
                               isOnBreak
                                 ? "bg-amber-400"
                                 : isPresent
@@ -1647,7 +1661,7 @@ export default function AdminDashboard({
                           </div>
 
                           <div className="min-w-0">
-                            <h4 className="font-bold text-xs text-slate-900 dark:text-white truncate group-hover:text-indigo-500 transition-colors">
+                            <h4 className="font-extrabold text-xs sm:text-sm text-slate-900 dark:text-white truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
                               {emp.fullName}
                             </h4>
                             <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate mt-0.5">
@@ -1658,10 +1672,10 @@ export default function AdminDashboard({
                       </div>
 
                       {/* Status indicator row */}
-                      <div className="pt-2 border-t border-slate-200/60 dark:border-white/5 flex items-center justify-between text-[11px] font-mono">
-                        <div className="text-slate-500 dark:text-slate-400 truncate">
+                      <div className="pt-2.5 border-t border-slate-100 dark:border-white/5 flex items-center justify-between text-[11px] font-mono">
+                        <div className="text-slate-600 dark:text-slate-300 truncate">
                           {log?.timeIn ? (
-                            <span>In: <strong className="text-slate-800 dark:text-slate-200">{formatTo12Hour(log.timeIn)}</strong></span>
+                            <span>In: <strong className="text-slate-900 dark:text-white font-bold">{formatTo12Hour(log.timeIn)}</strong></span>
                           ) : (
                             <span className="text-slate-400">Shift: 10PM–7AM</span>
                           )}
@@ -1669,31 +1683,31 @@ export default function AdminDashboard({
 
                         <div>
                           {isOnBreak ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-400/40 animate-pulse">
                               <Coffee className="w-3 h-3" />
                               <span>On Break</span>
                             </span>
                           ) : isTimedOut ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/15 text-sky-600 dark:text-sky-400 border border-sky-500/25">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
                               <Check className="w-3 h-3" />
                               <span>Shift Done</span>
                             </span>
                           ) : isPresent ? (
-                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
                               isLate 
-                                ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25" 
-                                : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25"
+                                ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-400/40" 
+                                : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30"
                             }`}>
                               <Activity className="w-3 h-3" />
                               <span>{isLate ? "Clocked Late" : "On Shift"}</span>
                             </span>
                           ) : approvedLeave ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/25">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30">
                               <CalendarDays className="w-3 h-3" />
                               <span>On Leave</span>
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-200/60 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-white/5">
                               <span>Not In Yet</span>
                             </span>
                           )}

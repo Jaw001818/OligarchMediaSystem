@@ -517,8 +517,8 @@ export default function BossCutoffAttendanceSummary({
         absentDays: absentCount,
         paidLeaveDays: paidLeaveDateSet.size,
         birthdayLeaveDays: bdayLeaveDateSet.size,
-        totalOTHours: parseFloat(totalOT.toFixed(2)),
-        totalRegularHours: parseFloat(totalRegHours.toFixed(2)),
+        totalOTHours: parseFloat(((totalOT || 0)).toFixed(2)),
+        totalRegularHours: parseFloat(((totalRegHours || 0)).toFixed(2)),
         lateDaysCount: lateCount,
         attendanceRate: rate,
         days: daysBreakdown
@@ -534,18 +534,18 @@ export default function BossCutoffAttendanceSummary({
     let totalHours = 0;
 
     employeeSummaries.forEach(s => {
-      totalPresent += s.presentDays;
-      totalAbsent += s.absentDays;
-      totalOT += s.totalOTHours;
-      totalHours += s.totalRegularHours;
+      totalPresent += (s.presentDays || 0);
+      totalAbsent += (s.absentDays || 0);
+      totalOT += (s.totalOTHours || 0);
+      totalHours += (s.totalRegularHours || 0);
     });
 
     return {
       totalEmployees: employeeSummaries.length,
       totalPresentDays: totalPresent,
       totalAbsentDays: totalAbsent,
-      totalOTHours: parseFloat(totalOT.toFixed(2)),
-      totalHoursWorked: parseFloat(totalHours.toFixed(2)),
+      totalOTHours: parseFloat(((totalOT || 0)).toFixed(2)),
+      totalHoursWorked: parseFloat(((totalHours || 0)).toFixed(2)),
       workingDays: totalWorkingDaysInCutoff
     };
   }, [employeeSummaries, totalWorkingDaysInCutoff]);
@@ -1398,7 +1398,7 @@ export default function BossCutoffAttendanceSummary({
                                 <td className="py-2.5 px-3 text-right">
                                   {(day?.otHours ?? 0) > 0 ? (
                                     <span className="font-black text-purple-700 dark:text-purple-300 bg-purple-100/70 dark:bg-purple-950/50 px-2 py-0.5 rounded border border-purple-300 dark:border-purple-800/50">
-                                      +{(day.otHours ?? 0).toFixed(2)} hrs OT
+                                      +{(day?.otHours ?? 0).toFixed(2)} hrs OT
                                     </span>
                                   ) : (
                                     <span className="text-zinc-400 text-[11px]">—</span>
