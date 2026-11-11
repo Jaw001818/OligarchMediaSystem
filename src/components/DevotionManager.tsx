@@ -45,6 +45,7 @@ import {
   Archive
 } from "lucide-react";
 import DevotionFlyerCard from "./DevotionFlyerCard";
+import DevotionLineupExportModal from "./DevotionLineupExportModal";
 import EmployeeSearchInput from "./EmployeeSearchInput";
 import { 
   OFFICIAL_FLIER_ROSTER, 
@@ -123,6 +124,9 @@ export default function DevotionManager({ employees, currentUser }: DevotionMana
   // Clear All Devotions Confirmation Modal States
   const [isClearAllModalOpen, setIsClearAllModalOpen] = useState(false);
   const [clearingAll, setClearingAll] = useState(false);
+
+  // Lineup Image Export Modal State (Admin Only)
+  const [isLineupExportModalOpen, setIsLineupExportModalOpen] = useState(false);
 
   const [toastMessage, setToastMessage] = useState<{ text: string; type: "success" | "error" | "info" } | null>(null);
 
@@ -937,6 +941,17 @@ export default function DevotionManager({ employees, currentUser }: DevotionMana
 
           {/* Action buttons toolbar */}
           <div className="w-full pt-4 border-t border-indigo-500/20 flex flex-wrap items-center gap-2.5">
+            {/* Primary Action: Download Lineup as Image to send to employees */}
+            <button
+              onClick={() => setIsLineupExportModalOpen(true)}
+              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs font-black font-mono transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-amber-500/20 flex-1 sm:flex-none ring-2 ring-amber-400/40"
+              title="Download advance devotion line up image to send to employees (Admin Only)"
+            >
+              <Download className="w-4 h-4 text-slate-950 shrink-0" />
+              <span>Download Lineup Image</span>
+              <span className="px-1.5 py-0.5 rounded-md bg-black/20 text-[9px] uppercase tracking-wider font-extrabold">PNG</span>
+            </button>
+
             <button
               onClick={() => openLoopModal()}
               className="px-3.5 py-2.5 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-500/40 text-indigo-200 text-xs font-bold font-mono transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm flex-1 sm:flex-none"
@@ -1382,6 +1397,7 @@ export default function DevotionManager({ employees, currentUser }: DevotionMana
             onDeleteSchedule={handleDeleteSchedule}
             onOpenLoopModal={openLoopModal}
             onRollDailyQueue={handleRollDailyQueue}
+            onOpenExportModal={() => setIsLineupExportModalOpen(true)}
             isRolling={isRollingQueue}
             isAdmin={true}
             currentUserId={currentUser?.uid}
@@ -2437,6 +2453,19 @@ export default function DevotionManager({ employees, currentUser }: DevotionMana
           </div>
         </div>
       )}
+
+      {/* Advance Devotion Lineup Image Export Modal (Admin Only) */}
+      <DevotionLineupExportModal
+        isOpen={isLineupExportModalOpen}
+        onClose={() => setIsLineupExportModalOpen(false)}
+        schedules={schedules}
+        employees={employees}
+        todayStr={todayStr}
+        isAdmin={true}
+        onScheduleUpdated={() => {
+          showToast("Advance schedules generated and refreshed!", "success");
+        }}
+      />
 
       {/* Toast Notification */}
       {toastMessage && (

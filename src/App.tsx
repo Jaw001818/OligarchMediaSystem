@@ -608,25 +608,30 @@ export default function App() {
             <Portal onLoginStateChange={setIsEmployeePortalLoggedIn} />
           </div>
           {!isEmployeePortalLoggedIn && (
-            <div className="py-8 bg-zinc-50 dark:bg-zinc-900 border-t border-zinc-200/60 dark:border-zinc-800/60 text-center flex flex-col items-center justify-center gap-2 mt-auto">
-              <p className="text-[11px] text-zinc-400 dark:text-zinc-500 font-mono">
-                Oligarch Media Secure Gateway • All activity is logged and monitored.
-              </p>
-              {currentUser ? (
+            <div className="py-6 bg-slate-50/80 dark:bg-[#07090E]/80 backdrop-blur-md border-t border-slate-200/60 dark:border-white/5 text-center flex flex-col items-center justify-center gap-1.5 mt-auto">
+              <p className="text-[10px] text-slate-400 dark:text-slate-500 font-mono flex items-center justify-center gap-1.5">
+                <span>Oligarch Media Studio Gateway</span>
+                {/* Discrete inconspicuous admin trigger: subtle dot symbol that only admins know to tap */}
                 <button
+                  type="button"
                   onClick={() => setPortalMode(false)}
-                  className="mt-1.5 flex items-center gap-1.5 px-4 py-2 rounded bg-indigo-50 hover:bg-indigo-100 dark:bg-zinc-800/60 dark:hover:bg-zinc-800 text-indigo-600 dark:text-zinc-350 hover:text-indigo-700 dark:hover:text-white transition-all text-[10px] font-bold uppercase tracking-widest border border-indigo-200 dark:border-zinc-700/50 cursor-pointer shadow-xs"
+                  className="text-slate-400 dark:text-slate-600 hover:text-slate-600 dark:hover:text-slate-300 transition-colors p-0.5 rounded cursor-pointer select-none"
+                  title="Studio Gateway"
+                  aria-label="Studio Gateway"
                 >
-                  <Smartphone className="w-3 h-3 text-indigo-500 animate-pulse" />
-                  <span>Return to Admin Console</span>
+                  •
                 </button>
-              ) : (
+                <span>All activity monitored</span>
+              </p>
+              {currentUser && (
+                /* Small discrete return pill when an admin is logged in */
                 <button
+                  type="button"
                   onClick={() => setPortalMode(false)}
-                  className="mt-1.5 flex items-center gap-1.5 px-4 py-2 rounded bg-zinc-200 hover:bg-zinc-300 dark:bg-zinc-800/60 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-white transition-all text-[10px] font-bold uppercase tracking-widest border border-zinc-300 dark:border-zinc-700/50 cursor-pointer shadow-xs"
+                  className="mt-1 inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-mono font-bold text-slate-400 hover:text-slate-200 bg-slate-200/60 dark:bg-white/5 hover:bg-slate-300 dark:hover:bg-white/10 border border-slate-300/60 dark:border-white/10 transition-all opacity-40 hover:opacity-100 cursor-pointer shadow-xs"
                 >
-                  <Lock className="w-3 h-3 text-amber-500 animate-pulse" />
-                  <span>Summon Admin Area</span>
+                  <Lock className="w-2.5 h-2.5 text-indigo-400" />
+                  <span>Admin Console</span>
                 </button>
               )}
             </div>
@@ -636,41 +641,45 @@ export default function App() {
         /* OTHERWISE: LOAD STANDARD ADMIN/LOGIN INTERACTIVE ACTIONS */
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
           {!currentUser ? (
-            /* PHASE A: AUTHENTICATION LOGIN DRAWER CARDS */
+            /* PHASE A: AUTHENTICATION FLOATING BUBBLE LOGIN */
             <div className="flex-1 flex items-center justify-center p-4 overflow-y-auto">
-              <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-805 w-full max-w-sm rounded-2xl overflow-hidden shadow-xl p-6 relative">
-                <div className="text-center mb-6">
-                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-sky-400 flex items-center justify-center text-white font-black text-xl mx-auto mb-3 shadow-lg ring-4 ring-indigo-500/20">
+              <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border border-slate-200/90 dark:border-white/10 ring-1 ring-slate-900/5 dark:ring-white/5 w-full max-w-sm rounded-[2.5rem] overflow-hidden shadow-2xl shadow-indigo-500/10 p-7 sm:p-8 relative animate-in fade-in zoom-in-95 duration-200">
+                {/* Floating ambient glow bubbles */}
+                <div className="absolute -top-12 -right-12 w-36 h-36 bg-gradient-to-br from-indigo-500/20 to-sky-400/15 rounded-full blur-2xl pointer-events-none" />
+                <div className="absolute -bottom-12 -left-12 w-32 h-32 bg-gradient-to-tr from-purple-500/15 to-transparent rounded-full blur-2xl pointer-events-none" />
+
+                <div className="text-center mb-6 relative">
+                  <div className="w-14 h-14 rounded-3xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-sky-400 flex items-center justify-center text-white font-black text-xl mx-auto mb-3 shadow-lg shadow-indigo-500/25 ring-4 ring-indigo-500/20">
                     OM
                   </div>
-                  <h3 className="text-lg font-extrabold text-zinc-900 dark:text-zinc-50 tracking-tight">Oligarch Media Control Panel</h3>
-                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 max-w-[240px] mx-auto font-mono">HR Calculations, Attendance & Studio Operations</p>
+                  <h3 className="text-lg font-black text-slate-900 dark:text-white tracking-tight">Oligarch Media Control Panel</h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 max-w-[240px] mx-auto font-mono">HR Calculations, Attendance & Studio Operations</p>
                 </div>
 
                 {authError && (
-                  <div className="p-3 bg-red-50 dark:bg-red-950/20 text-red-750 dark:text-red-400 text-xs rounded-xl flex items-center gap-2 border border-red-100 dark:border-red-900/30 mb-4 font-mono">
+                  <div className="p-3 bg-red-50 dark:bg-red-950/20 text-red-750 dark:text-red-400 text-xs rounded-2xl flex items-center gap-2 border border-red-100 dark:border-red-900/30 mb-4 font-mono">
                     <AlertTriangle className="w-4 h-4 shrink-0 text-red-500" />
                     <span className="break-all">{authError}</span>
                   </div>
                 )}
 
                 {authMessage && (
-                  <div className="p-3 bg-green-50 dark:bg-green-950/20 text-green-750 dark:text-green-400 text-xs rounded-xl flex items-center gap-2 border border-green-100 dark:border-green-900/30 mb-4">
+                  <div className="p-3 bg-green-50 dark:bg-green-950/20 text-green-750 dark:text-green-400 text-xs rounded-2xl flex items-center gap-2 border border-green-100 dark:border-green-900/30 mb-4">
                     <UserCheck className="w-4 h-4 shrink-0 text-green-500" />
                     <span>{authMessage}</span>
                   </div>
                 )}
 
-                <form onSubmit={isRegisterMode ? handleRegister : handleLogin} className="space-y-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-zinc-500 font-mono uppercase tracking-wider">ADMIN USERNAME / EMAIL</label>
+                <form onSubmit={isRegisterMode ? handleRegister : handleLogin} className="space-y-4 relative">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 font-mono uppercase tracking-wider">ADMIN USERNAME / EMAIL</label>
                     <input
                       type="email"
                       required
                       placeholder="e.g. admin@novacorporate.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="w-full text-xs px-3.5 py-2.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-808 rounded-xl focus:outline-none dark:text-zinc-100 font-mono"
+                      className="w-full text-xs px-4 py-2.5 bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-white/10 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 text-slate-900 dark:text-white font-mono transition-all"
                     />
                   </div>
 
@@ -682,23 +691,23 @@ export default function App() {
                     
                     if (isSuperAdminEmail && !isRegisterMode) {
                       return (
-                        <div className="p-3.5 bg-sky-500/10 border border-sky-500/20 text-sky-400 text-[10px] rounded-xl flex items-center gap-2.5 font-mono animate-in fade-in duration-200">
-                          <ShieldCheck className="w-4 h-4 shrink-0 text-sky-400" />
+                        <div className="p-3 bg-sky-500/10 border border-sky-500/20 text-sky-500 dark:text-sky-400 text-[10px] rounded-2xl flex items-center gap-2.5 font-mono animate-in fade-in duration-200">
+                          <ShieldCheck className="w-4 h-4 shrink-0 text-sky-500" />
                           <span>Identified as Super Admin. Password not required.</span>
                         </div>
                       );
                     }
 
                     return (
-                      <div className="space-y-1 animate-in fade-in duration-200">
-                        <label className="text-[10px] font-bold text-zinc-500 font-mono uppercase tracking-wider font-medium">PASSWORD OR ADMIN PIN</label>
+                      <div className="space-y-1.5 animate-in fade-in duration-200">
+                        <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 font-mono uppercase tracking-wider">PASSWORD OR ADMIN PIN</label>
                         <input
                           type="password"
                           required={!isSuperAdminEmail || isRegisterMode}
                           placeholder="Enter Password or 4-12 digit PIN"
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
-                          className="w-full text-xs px-3.5 py-2.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-808 rounded-xl focus:outline-none dark:text-zinc-100 font-mono text-center tracking-widest font-bold"
+                          className="w-full text-xs px-4 py-2.5 bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-white/10 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 text-slate-900 dark:text-white font-mono text-center tracking-widest font-bold transition-all"
                         />
                       </div>
                     );
@@ -706,41 +715,32 @@ export default function App() {
 
                   <button
                     type="submit"
-                    className="w-full bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold py-2.5 rounded-xl text-xs shadow-sm transition-colors cursor-pointer"
+                    className="w-full bg-gradient-to-r from-indigo-600 via-indigo-500 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold py-3 rounded-2xl text-xs shadow-lg shadow-indigo-600/30 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
                   >
                     {isRegisterMode ? "Confirm Setup Admin" : "Sign In Console"}
                   </button>
                 </form>
 
                 {/* Seeding / signup helper options */}
-                <div className="mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-900 flex justify-between items-center text-[11px] font-semibold text-zinc-500">
-                  <button onClick={handleResetPassword} className="hover:text-zinc-900 dark:hover:text-zinc-300">
+                <div className="mt-4 pt-4 border-t border-slate-100 dark:border-white/5 flex justify-between items-center text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                  <button onClick={handleResetPassword} className="hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer">
                     Forgot Password?
                   </button>
 
                   <button 
                     onClick={() => setIsRegisterMode(!isRegisterMode)} 
-                    className="text-blue-600 hover:underline cursor-pointer"
+                    className="text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
                   >
                     {isRegisterMode ? "Switch to Login" : "Register Admin"}
                   </button>
                 </div>
 
-                <div className="mt-4 p-3 bg-blue-50/50 dark:bg-zinc-900/60 rounded-xl text-[10px] text-zinc-500 leading-relaxed border border-zinc-200/50 dark:border-zinc-805 space-y-1.5">
-                  <div>
-                    <strong className="text-zinc-700 dark:text-zinc-300 font-bold">Super Admin access:</strong> Login with <strong>{settings?.adminEmail || "hr.oligarchmedia@gmail.com"}</strong>. <span className="text-sky-600 dark:text-sky-450 font-extrabold font-mono uppercase tracking-wide">No password required!</span>
-                  </div>
-                  <div className="pt-1.5 border-t border-zinc-150 dark:border-zinc-800">
-                    <strong className="text-zinc-700 dark:text-zinc-300 font-bold">Staff Admin access:</strong> Assign any employee as <strong>Admin Power</strong> in the Directory, and set their <strong>PIN Code</strong>. They can log in using their primary <strong>Email</strong> and that <strong>PIN</strong>.
-                  </div>
-                </div>
-
-                <div className="mt-5 pt-3 border-t border-zinc-100 dark:border-zinc-900 flex justify-center">
+                <div className="mt-5 pt-3 border-t border-slate-100 dark:border-white/5 flex justify-center">
                   <button
                     onClick={() => setPortalMode(true)}
-                    className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900/80 dark:hover:bg-zinc-800 text-zinc-650 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors text-[10px] font-bold uppercase tracking-wider border border-zinc-200 dark:border-zinc-800 cursor-pointer shadow-xs"
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors text-[10px] font-bold uppercase tracking-wider border border-slate-200 dark:border-white/5 cursor-pointer shadow-xs"
                   >
-                    <Smartphone className="w-3.5 h-3.5 text-blue-500" />
+                    <Smartphone className="w-3.5 h-3.5 text-indigo-500" />
                     <span>Go to Employee Portal</span>
                   </button>
                 </div>

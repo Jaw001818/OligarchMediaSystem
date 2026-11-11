@@ -15,7 +15,8 @@ import {
   ChevronRight,
   ChevronLeft,
   Edit3,
-  Trash2
+  Trash2,
+  Download
 } from "lucide-react";
 
 interface DevotionFlyerCardProps {
@@ -26,6 +27,7 @@ interface DevotionFlyerCardProps {
   onDeleteSchedule?: (scheduleId: string, dateStr: string) => void;
   onOpenLoopModal?: () => void;
   onRollDailyQueue?: () => void;
+  onOpenExportModal?: () => void;
   isRolling?: boolean;
   isAdmin?: boolean;
   currentUserId?: string;
@@ -42,6 +44,7 @@ export default function DevotionFlyerCard({
   onDeleteSchedule,
   onOpenLoopModal,
   onRollDailyQueue,
+  onOpenExportModal,
   isRolling = false,
   isAdmin = false,
   currentUserId,
@@ -230,6 +233,18 @@ export default function DevotionFlyerCard({
             >
               <Repeat className="w-3.5 h-3.5 text-indigo-400" />
               <span>Loop Devotions</span>
+            </button>
+          )}
+
+          {isAdmin && onOpenExportModal && (
+            <button
+              type="button"
+              onClick={onOpenExportModal}
+              className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs font-mono font-black flex items-center gap-1.5 transition-all cursor-pointer shadow-md"
+              title="Download devotion lineup image to send to employees in advance"
+            >
+              <Download className="w-3.5 h-3.5 text-slate-950" />
+              <span>Download Lineup Image</span>
             </button>
           )}
         </div>
