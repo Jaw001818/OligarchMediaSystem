@@ -21,7 +21,16 @@ import {
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+const cliPortIdx = process.argv.indexOf("--port");
+const cliPort = cliPortIdx !== -1 && process.argv[cliPortIdx + 1] ? parseInt(process.argv[cliPortIdx + 1], 10) : NaN;
+const envPort = process.env.PORT ? parseInt(process.env.PORT, 10) : NaN;
+const nginxPort = process.env.NGINX_PORT ? parseInt(process.env.NGINX_PORT, 10) : 8080;
+const defaultAppPort = process.env.DEFAULT_APP_PORT ? parseInt(process.env.DEFAULT_APP_PORT, 10) : 3000;
+const PORT = !Number.isNaN(cliPort)
+  ? cliPort
+  : (!Number.isNaN(envPort) && !(process.env.NODE_ENV !== "production" && envPort === nginxPort))
+    ? envPort
+    : defaultAppPort;
 
 function getGenAI() {
   const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY || "";
@@ -770,8 +779,12 @@ async function syncWithPublishedApp() {
 
 // Perform one-time initial pull only on server startup to seed local memory store,
 // with zero automated periodic write-loops to strictly preserve Firestore free tier quota.
-setTimeout(pullAllFromFirestore, 1500);
-setTimeout(syncWithPublishedApp, 3000);
+setTimeout(() => {
+  pullAllFromFirestore().catch((err) => console.warn("[Server DB] Initial pull warning:", err?.message || err));
+}, 1500);
+setTimeout(() => {
+  syncWithPublishedApp().catch((err) => console.warn("[Server DB] Peer sync warning:", err?.message || err));
+}, 3000);
 
 // Server-Sent Events (SSE) active subscriber pool for real-time cross-device updates
 const sseSubscribers: Set<express.Response> = new Set();
@@ -1399,7 +1412,10 @@ async function setupVite() {
 
   if (!isProduction) {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        hmr: process.env.DISABLE_HMR !== "true",
+      },
       appType: "spa",
     });
     app.use(vite.middlewares);
@@ -1415,9 +1431,18 @@ async function setupVite() {
 export default app;
 
 if (!process.env.VERCEL) {
-  setupVite().then(() => {
-    app.listen(PORT, "0.0.0.0", () => {
-      console.log(`[FULL-STACK] Express server live at http://0.0.0.0:${PORT}`);
+  setupVite()
+    .then(() => {
+      const server = app.listen(PORT, "0.0.0.0", () => {
+        console.log(`[FULL-STACK] Express server live at http://0.0.0.0:${PORT}`);
+      });
+      server.on("error", (err: any) => {
+        console.error("[FULL-STACK] HTTP server listen error:", err);
+        process.exit(1);
+      });
+    })
+    .catch((err) => {
+      console.error("[FULL-STACK] Failed to initialize Vite/Express server:", err);
+      process.exit(1);
     });
-  });
 }

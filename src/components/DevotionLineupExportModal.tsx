@@ -12,13 +12,9 @@ import {
   Layers, 
   Settings2, 
   RefreshCw,
-  PlusCircle,
   Eye,
-  Sliders,
-  Maximize2
+  AlertCircle
 } from "lucide-react";
-import { addDaysToDateStr, isWeekendDateStr, ensureWeekdayDateStr } from "../utils/devotionScheduler";
-import { db, setDoc, doc } from "../firebase";
 
 interface DevotionLineupExportModalProps {
   isOpen: boolean;
@@ -124,7 +120,7 @@ export default function DevotionLineupExportModal({
   // Status
   const [isDownloading, setIsDownloading] = useState(false);
   const [copiedSuccess, setCopiedSuccess] = useState(false);
-  const [isGeneratingMore, setIsGeneratingMore] = useState(false);
+  const [exportError, setExportError] = useState<string>("");
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string>("");
 
   // Helper to format short names
@@ -577,6 +573,7 @@ export default function DevotionLineupExportModal({
     setIsDownloading(true);
 
     try {
+      setExportError("");
       // Ensure canvas is fully painted
       await drawLineupOnCanvas();
 
@@ -593,7 +590,7 @@ export default function DevotionLineupExportModal({
       document.body.removeChild(link);
     } catch (err) {
       console.error("Failed to download devotion lineup image:", err);
-      alert("Could not generate image. Please try again or use the print option.");
+      setExportError("Could not generate PNG image. Try using Print PDF instead.");
     } finally {
       setIsDownloading(false);
     }
@@ -604,6 +601,7 @@ export default function DevotionLineupExportModal({
     const canvas = canvasRef.current;
     if (!canvas) return;
     setIsDownloading(true);
+    setExportError("");
 
     try {
       await drawLineupOnCanvas();
@@ -628,55 +626,6 @@ export default function DevotionLineupExportModal({
       console.warn("Direct clipboard copy failed, downloading instead:", err);
       handleDownloadImage();
       setIsDownloading(false);
-    }
-  };
-
-  // Quick helper: Generate advance days if fewer than desired rows exist
-  const handleGenerateAdvanceDays = async () => {
-    if (employees.length < 2) {
-      alert("At least 2 active employees are needed to generate schedules.");
-      return;
-    }
-    setIsGeneratingMore(true);
-    try {
-      const activeEmps = employees.filter((e) => (e.status || "Active") === "Active");
-      const names = activeEmps.map((e) => e.fullName.trim());
-
-      let lastDate = sortedUpcoming.length > 0 
-        ? sortedUpcoming[sortedUpcoming.length - 1].date 
-        : ensureWeekdayDateStr(todayStr);
-
-      const daysToAdd = 10;
-      let currIndex = sortedUpcoming.length % names.length;
-
-      for (let i = 0; i < daysToAdd; i++) {
-        lastDate = addDaysToDateStr(lastDate, 1, true); // strictly weekday
-        const devName = names[(currIndex + i) % names.length];
-        const prayName = names[(currIndex + i + 1) % names.length];
-
-        const newDoc: Partial<DevotionSchedule> = {
-          id: lastDate,
-          date: lastDate,
-          devotionLeaderName: devName,
-          prayerLeaderName: prayName,
-          status: "upcoming",
-          topic: "Daily Devotion & Shift Alignment",
-          scripture: "Philippians 4:6-7",
-          notes: "Advance Lineup Roster",
-          isAbsent: false,
-          isPrayerAbsent: false,
-          updatedAt: new Date().toISOString(),
-          updatedBy: "Admin Advance Generator"
-        };
-
-        await setDoc(doc(db, "devotion_schedules", lastDate), newDoc, { merge: true });
-      }
-
-      if (onScheduleUpdated) onScheduleUpdated();
-    } catch (err) {
-      console.error("Error generating advance devotion days:", err);
-    } finally {
-      setIsGeneratingMore(false);
     }
   };
 
@@ -877,30 +826,22 @@ export default function DevotionLineupExportModal({
                 <span>Include Date Range Banner</span>
               </label>
 
-              {/* Advance generation button if rows are limited */}
+              {/* Manual scheduling hint when fewer shifts exist */}
               {displayedRows.length < 15 && (
-                <div className="pt-2 border-t border-slate-800/80">
-                  <button
-                    type="button"
-                    onClick={handleGenerateAdvanceDays}
-                    disabled={isGeneratingMore}
-                    className="w-full py-2 px-3 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-mono font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    {isGeneratingMore ? (
-                      <>
-                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                        <span>Generating Advance Days...</span>
-                      </>
-                    ) : (
-                      <>
-                        <PlusCircle className="w-3.5 h-3.5" />
-                        <span>Add +10 More Advance Shifts</span>
-                      </>
-                    )}
-                  </button>
+                <div className="pt-2 border-t border-slate-800/80 text-[11px] font-mono text-slate-400">
+                  {displayedRows.length === 0
+                    ? "No upcoming shifts assigned yet. Close this dialog and use Assign / Plan Multiple Days in Devotion Desk."
+                    : `${displayedRows.length} manually assigned shift${displayedRows.length === 1 ? "" : "s"} currently loaded. Add more days in Devotion Desk if needed.`}
                 </div>
               )}
             </div>
+
+            {exportError && (
+              <div className="p-2.5 rounded-xl bg-rose-950/50 border border-rose-500/40 text-rose-200 text-xs font-mono flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                <span>{exportError}</span>
+              </div>
+            )}
 
             {/* Quick Action Buttons */}
             <div className="space-y-2.5">

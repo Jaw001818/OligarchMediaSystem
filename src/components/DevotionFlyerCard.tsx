@@ -1,17 +1,8 @@
 import React, { useState, useMemo } from "react";
 import { DevotionSchedule } from "../types";
 import { 
-  Sparkles, 
   Calendar, 
-  Eye, 
   Repeat, 
-  UserCheck, 
-  UserX, 
-  Clock, 
-  Check, 
-  Info,
-  RefreshCw,
-  Shuffle,
   ChevronRight,
   ChevronLeft,
   Edit3,
@@ -26,9 +17,7 @@ interface DevotionFlyerCardProps {
   onEditSchedule?: (schedule: DevotionSchedule) => void;
   onDeleteSchedule?: (scheduleId: string, dateStr: string) => void;
   onOpenLoopModal?: () => void;
-  onRollDailyQueue?: () => void;
   onOpenExportModal?: () => void;
-  isRolling?: boolean;
   isAdmin?: boolean;
   currentUserId?: string;
   currentUserName?: string;
@@ -43,9 +32,7 @@ export default function DevotionFlyerCard({
   onEditSchedule,
   onDeleteSchedule,
   onOpenLoopModal,
-  onRollDailyQueue,
   onOpenExportModal,
-  isRolling = false,
   isAdmin = false,
   currentUserId,
   currentUserName,
@@ -157,7 +144,7 @@ export default function DevotionFlyerCard({
           <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded border hidden sm:inline ${
             isAdmin ? "bg-indigo-500/10 text-indigo-400 border-indigo-500/20" : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
           }`}>
-            {isAdmin ? "15-Day Sequence (5 Advance Planning)" : "10-Day Rolling View"}
+            {isAdmin ? "Admin Manual Lineup" : "10-Day Active Schedule"}
           </span>
         </div>
 
@@ -201,38 +188,15 @@ export default function DevotionFlyerCard({
             </div>
           )}
 
-
-          {isAdmin && onRollDailyQueue && schedules.length > 0 && (
-            <button
-              type="button"
-              onClick={onRollDailyQueue}
-              disabled={isRolling}
-              className="px-3 py-1.5 rounded-xl bg-emerald-600/30 hover:bg-emerald-600/50 border border-emerald-500/40 text-emerald-200 text-xs font-mono font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
-              title="Advance 1 day: Removes top past day and appends newly generated fair random pair at bottom"
-            >
-              {isRolling ? (
-                <>
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin text-emerald-400" />
-                  <span>Rolling...</span>
-                </>
-              ) : (
-                <>
-                  <Shuffle className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Advance 1 Day</span>
-                </>
-              )}
-            </button>
-          )}
-
           {isAdmin && onOpenLoopModal && (
             <button
               type="button"
               onClick={onOpenLoopModal}
               className="px-3 py-1.5 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-500/40 text-indigo-200 text-xs font-mono font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
-              title="Loop your current devotion pattern forward across upcoming Monday–Friday business days"
+              title="Repeat your manually set devotion pattern forward across upcoming Monday–Friday business days"
             >
               <Repeat className="w-3.5 h-3.5 text-indigo-400" />
-              <span>Loop Devotions</span>
+              <span>Repeat Pattern</span>
             </button>
           )}
 
@@ -258,11 +222,13 @@ export default function DevotionFlyerCard({
             Viewing: <strong className="text-white underline">{formatMonthLabel(activeMonth)}</strong>
           </span>
           <span className="text-zinc-500">
-            ({displayedSchedules.length} {displayedSchedules.length === 1 ? "day" : "days"} scheduled in this month)
+            ({displayedSchedules.length} {displayedSchedules.length === 1 ? "day" : "days"} scheduled in this view)
           </span>
         </div>
         <span className="text-zinc-500 text-[11px] hidden md:inline">
-          Tip: Hover over any row to quickly <strong>Edit</strong>, <strong>Substitute</strong>, or <strong>Delete</strong>
+          {isAdmin
+            ? <>Click <strong>Change</strong> to adjust leaders or <strong>Sub</strong> when someone is absent</>
+            : "Tap any row to view details or assign an absent substitute"}
         </span>
       </div>
 
@@ -368,11 +334,11 @@ export default function DevotionFlyerCard({
                                 e.stopPropagation();
                                 onEditSchedule(row);
                               }}
-                              title="Edit schedule entry"
-                              className="px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white text-[10px] font-mono font-bold flex items-center gap-1 border border-zinc-700 cursor-pointer shadow-xs transition-all"
+                              title="Change assigned leaders for this date"
+                              className="px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 hover:text-white text-[10px] font-mono font-bold flex items-center gap-1 border border-zinc-700 cursor-pointer shadow-xs transition-all"
                             >
                               <Edit3 className="w-2.5 h-2.5 text-indigo-400" />
-                              <span>Edit</span>
+                              <span>Change</span>
                             </button>
                           )}
 
@@ -383,8 +349,8 @@ export default function DevotionFlyerCard({
                                 e.stopPropagation();
                                 onOpenSubstituteModal(row, "devotion");
                               }}
-                              title="Swap or assign substitute"
-                              className="px-2 py-0.5 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 text-[10px] font-mono font-bold flex items-center gap-1 border border-amber-500/30 cursor-pointer shadow-xs transition-all"
+                              title="Mark absent and assign substitute"
+                              className="px-2 py-0.5 rounded bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 text-[10px] font-mono font-bold flex items-center gap-1 border border-amber-500/35 cursor-pointer shadow-xs transition-all"
                             >
                               <Repeat className="w-2.5 h-2.5" />
                               <span>Sub</span>
@@ -414,11 +380,15 @@ export default function DevotionFlyerCard({
                   <div className="grid grid-cols-2 gap-2.5 sm:gap-4">
                     {/* Left Box: Devotion Leader */}
                     <div 
-                      className={`relative py-2.5 sm:py-3 px-3 text-center rounded-xl font-black text-xs sm:text-sm tracking-wider uppercase transition-all shadow-sm bg-[#1a1d26]/95 hover:bg-[#212531] text-white border border-zinc-800/80 ${hasDevSub ? "border-l-4 border-l-amber-500" : ""}`}
+                      className={`relative py-2.5 sm:py-3 px-3 text-center rounded-xl font-black text-xs sm:text-sm tracking-wider uppercase transition-all shadow-sm ${
+                        hasDevSub
+                          ? "bg-amber-950/25 border border-amber-500/60 text-white"
+                          : "bg-[#1a1d26]/95 hover:bg-[#212531] text-white border border-zinc-800/80"
+                      }`}
                     >
                       {hasDevSub ? (
                         <div className="flex flex-col items-center justify-center leading-tight">
-                          <span className="text-[9px] font-mono text-zinc-500 line-through">
+                          <span className="text-[9px] font-mono text-zinc-400 line-through">
                             {row.devotionLeaderName}
                           </span>
                           <span className="text-amber-400 font-black">
@@ -432,11 +402,15 @@ export default function DevotionFlyerCard({
 
                     {/* Right Box: Prayer Leader */}
                     <div 
-                      className={`relative py-2.5 sm:py-3 px-3 text-center rounded-xl font-black text-xs sm:text-sm tracking-wider uppercase transition-all shadow-sm bg-[#1a1d26]/95 hover:bg-[#212531] text-white border border-zinc-800/80 ${hasPraySub ? "border-l-4 border-l-amber-500" : ""}`}
+                      className={`relative py-2.5 sm:py-3 px-3 text-center rounded-xl font-black text-xs sm:text-sm tracking-wider uppercase transition-all shadow-sm ${
+                        hasPraySub
+                          ? "bg-amber-950/25 border border-amber-500/60 text-white"
+                          : "bg-[#1a1d26]/95 hover:bg-[#212531] text-white border border-zinc-800/80"
+                      }`}
                     >
                       {hasPraySub ? (
                         <div className="flex flex-col items-center justify-center leading-tight">
-                          <span className="text-[9px] font-mono text-zinc-500 line-through">
+                          <span className="text-[9px] font-mono text-zinc-400 line-through">
                             {row.prayerLeaderName}
                           </span>
                           <span className="text-amber-400 font-black">

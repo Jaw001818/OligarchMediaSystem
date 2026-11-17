@@ -50,13 +50,14 @@ import {
   LayoutGrid,
   List,
   AlertCircle,
-  RefreshCw
+  RefreshCw,
+  GraduationCap
 } from "lucide-react";
 import DevotionFlyerCard from "./DevotionFlyerCard";
 import EmployeeSearchInput from "./EmployeeSearchInput";
 import { jsPDF } from "jspdf";
 import { maintainRollingSchedule } from "../utils/devotionScheduler";
-import { calculateAttendanceHours, getLiveTimerSeconds, ensureEmployee002Exists, formatTo12Hour, getBusinessDate, getEmployeeSchedule, getBirthdayWeekInfo, getManilaTimeString, getManilaDateString } from "../utils";
+import { calculateAttendanceHours, getLiveTimerSeconds, ensureEmployee002Exists, formatTo12Hour, getBusinessDate, getEmployeeSchedule, getBirthdayWeekInfo, getManilaTimeString, getManilaDateString, isEmployeeInTraining, getTrainingProgress } from "../utils";
 
 // Real-time calculated working hours timer
 
@@ -106,9 +107,10 @@ const formatSeconds = (totalSeconds: number) => {
 
 interface PortalProps {
   onLoginStateChange?: (isLoggedIn: boolean) => void;
+  onAdminLogin?: (user: any) => void;
 }
 
-export default function Portal({ onLoginStateChange }: PortalProps = {}) {
+export default function Portal({ onLoginStateChange, onAdminLogin }: PortalProps = {}) {
   const [verifiedEmployee, setVerifiedEmployee] = useState<Employee | null>(null);
   const [settings, setSettings] = useState<any>(null);
   const autoBreakInFlightRef = useRef(false);
@@ -138,6 +140,7 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
     isTomorrow: boolean;
   } | null>(null);
   const [showPortalSubstituteModal, setShowPortalSubstituteModal] = useState(false);
+  const [portalSubstituteTargetSchedule, setPortalSubstituteTargetSchedule] = useState<DevotionSchedule | null>(null);
   const [portalSubstituteTargetRole, setPortalSubstituteTargetRole] = useState<"devotion" | "prayer">("devotion");
   const [portalSubstituteEmployeeId, setPortalSubstituteEmployeeId] = useState("");
   const [portalSubstituteEmployeeName, setPortalSubstituteEmployeeName] = useState("");
@@ -309,15 +312,16 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
 
   const handlePortalSubmitSubstitute = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!assignedDevotionNotice || !assignedDevotionNotice.schedule.id || !verifiedEmployee) return;
+    const targetSchedule = portalSubstituteTargetSchedule || assignedDevotionNotice?.schedule;
+    if (!targetSchedule || !targetSchedule.id || !verifiedEmployee) return;
     if (!portalSubstituteEmployeeName.trim()) {
-      alert("Please select or enter the substitute leader.");
+      showPunchToast("Substitute Required", "Please select or enter the substitute leader.", "error");
       return;
     }
 
     setIsSubmittingPortalSubstitute(true);
     try {
-      const schedId = assignedDevotionNotice.schedule.id;
+      const schedId = targetSchedule.id;
       const updates: any = {
         updatedAt: new Date().toISOString(),
         updatedBy: `${verifiedEmployee.fullName} (Self-Reported Absent)`,
@@ -338,24 +342,32 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
       await addDoc(collection(db, "audit_logs"), {
         user: verifiedEmployee.fullName,
         action: "Employee Swapped Devotion Leader (Absent)",
-        details: `${verifiedEmployee.fullName} marked absent for ${portalSubstituteTargetRole.toUpperCase()} on ${assignedDevotionNotice.schedule.date}. Designated substitute: ${portalSubstituteEmployeeName}. Reason: ${portalSubstituteReason || "Not specified"}.`,
+        details: `${verifiedEmployee.fullName} marked absent for ${portalSubstituteTargetRole.toUpperCase()} on ${targetSchedule.date}. Designated substitute: ${portalSubstituteEmployeeName}. Reason: ${portalSubstituteReason || "Not specified"}.`,
         timestamp: new Date().toISOString()
       });
 
       await addDoc(collection(db, "notifications"), {
         title: "Employee Swapped Devotion Duty",
-        message: `${verifiedEmployee.fullName} designated ${portalSubstituteEmployeeName} as substitute for ${portalSubstituteTargetRole === "devotion" ? "Devotion" : "Prayer"} on ${assignedDevotionNotice.schedule.date}. Reason: ${portalSubstituteReason || "Absent"}.`,
+        message: `${verifiedEmployee.fullName} designated ${portalSubstituteEmployeeName} as substitute for ${portalSubstituteTargetRole === "devotion" ? "Devotion" : "Prayer"} on ${targetSchedule.date}. Reason: ${portalSubstituteReason || "Absent"}.`,
         type: "Alert",
         read: false,
         createdAt: new Date().toISOString()
       });
 
-      alert(`Substitute leader assigned successfully! HR and your team will see ${portalSubstituteEmployeeName} on the roster.`);
+      showPunchToast(
+        "Substitute Leader Assigned",
+        `${portalSubstituteEmployeeName} will cover ${portalSubstituteTargetRole === "devotion" ? "Devotion" : "Prayer"} on ${targetSchedule.date}.`,
+        "success"
+      );
       setShowPortalSubstituteModal(false);
+      setPortalSubstituteTargetSchedule(null);
+      setPortalSubstituteEmployeeId("");
+      setPortalSubstituteEmployeeName("");
+      setPortalSubstituteReason("");
       setShowDevotionPopup(false);
     } catch (err) {
       console.error("Error submitting substitute:", err);
-      alert("Failed to submit substitute. Please try again.");
+      showPunchToast("Submission Failed", "Failed to submit substitute. Please try again.", "error");
     } finally {
       setIsSubmittingPortalSubstitute(false);
     }
@@ -1565,11 +1577,12 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
         requiredHours
       );
 
+      const isTrainee = isEmployeeInTraining(verifiedEmployee);
       const isOnline = navigator.onLine;
       const updatePayload: Partial<Attendance> = {
         timeOut: timeOutStr,
         hoursWorked: math.hoursWorked,
-        otHours: math.otHours,
+        otHours: isTrainee ? 0 : math.otHours,
         status: "Timed Out",
         shiftStart: workHourStart,
         shiftEnd: workHourEnd,
@@ -1587,7 +1600,7 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
       showPunchToast(
         isOnline ? `✓ Clock Out Recorded: ${formatTo12Hour(timeOutStr)}` : `⏱ Clock Out (Offline): ${formatTo12Hour(timeOutStr)}`,
         isOnline 
-          ? `Shift Completed: ${math.hoursWorked} hrs logged${math.otHours > 0 ? ` (+${math.otHours}h OT)` : ""}. Synced with Cloud.`
+          ? `Shift Completed: ${math.hoursWorked} hrs logged${isTrainee ? " (Training · No OT)" : math.otHours > 0 ? ` (+${math.otHours}h OT)` : ""}. Synced with Cloud.`
           : `Saved locally (Pending Sync). Will automatically sync to Cloud when connected.`,
         isOnline ? "success" : "info"
       );
@@ -1595,6 +1608,18 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
       // 3. Persist to Firestore
       const docRef = doc(db, "attendance", todayAttendance.id);
       await updateDoc(docRef, updatePayload);
+
+      // Reset custom presence status back to default active upon clocking out
+      if (verifiedEmployee.id) {
+        updateDoc(doc(db, "employees", verifiedEmployee.id), {
+          presenceStatus: "active",
+          presenceNote: "",
+          presenceUpdatedAt: Date.now()
+        }).catch(() => {});
+        setVerifiedEmployee((prev) =>
+          prev ? { ...prev, presenceStatus: "active", presenceNote: "" } : null
+        );
+      }
 
       // 4. Background auxiliary logs
       addDoc(collection(db, "audit_logs"), {
@@ -1628,25 +1653,118 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
     setIsVerifying(true);
 
     try {
-      let cleanNum = employeeNum.trim().toUpperCase();
+      const rawInput = employeeNum.trim();
+      const inputLower = rawInput.toLowerCase();
+
+      // Check if Admin Super Email is entered in this single login portal
+      const isSuperAdminEmail =
+        inputLower === "hr.oligarchmedia@gmail.com" ||
+        inputLower === "oligarchmediaph@gmail.com" ||
+        (settings?.adminEmail && inputLower === settings.adminEmail.toLowerCase());
+
+      if (isSuperAdminEmail) {
+        const sessionUser = {
+          email: inputLower,
+          uid: "super-admin-root",
+          displayName: "Super Administrator (HR)",
+          isSuperAdmin: true
+        };
+        localStorage.setItem("nova_admin_session", JSON.stringify(sessionUser));
+        setEmployeeNum("");
+        setPortalPin("");
+        if (onAdminLogin) {
+          onAdminLogin(sessionUser);
+        }
+        setIsVerifying(false);
+        return;
+      }
+
+      // Check if an email was entered for an employee administrator
+      if (inputLower.includes("@")) {
+        const qEmail = query(collection(db, "employees"), where("email", "==", inputLower));
+        const emailSnap = await getDocs(qEmail);
+        let matchedAdminEmp: Employee | null = null;
+        emailSnap.forEach((d) => {
+          const empData = d.data() as Employee;
+          if (
+            empData.isAdmin ||
+            (empData.position && empData.position.toLowerCase().includes("admin")) ||
+            (empData.position && empData.position.toLowerCase().includes("hr manager"))
+          ) {
+            matchedAdminEmp = { ...empData, id: d.id };
+          }
+        });
+
+        if (matchedAdminEmp) {
+          const emp = matchedAdminEmp as Employee;
+          const enteredPin = portalPin.trim();
+          const savedPin = emp.pin ? emp.pin.trim() : "1234";
+
+          if (enteredPin === savedPin) {
+            const sessionUser = {
+              email: emp.email,
+              uid: `admin-emp-${emp.id}`,
+              displayName: emp.fullName,
+              isSuperAdmin: false
+            };
+            localStorage.setItem("nova_admin_session", JSON.stringify(sessionUser));
+            setEmployeeNum("");
+            setPortalPin("");
+            if (onAdminLogin) {
+              onAdminLogin(sessionUser);
+            }
+            setIsVerifying(false);
+            return;
+          } else {
+            setAuthError("Incorrect Admin PIN for this account.");
+            setIsVerifying(false);
+            return;
+          }
+        }
+      }
+
+      // Otherwise verify employee number / ID
+      let cleanNum = rawInput.toUpperCase();
       if (cleanNum.startsWith("EMP-")) {
         cleanNum = cleanNum.substring(4);
       }
 
-      const q = query(
+      let q = query(
         collection(db, "employees"),
         where("employeeNumber", "==", cleanNum)
       );
-      const snapshot = await getDocs(q);
+      let snapshot = await getDocs(q);
+
+      // If not found by exact number, check full name matching
+      if (snapshot.empty) {
+        const allEmpSnap = await getDocs(collection(db, "employees"));
+        let foundByName: any = null;
+        allEmpSnap.forEach((d) => {
+          const eData = d.data() as Employee;
+          if (
+            eData.fullName.toLowerCase().includes(inputLower) ||
+            (eData.firstName && eData.firstName.toLowerCase().includes(inputLower)) ||
+            (eData.lastName && eData.lastName.toLowerCase().includes(inputLower))
+          ) {
+            foundByName = { ...eData, id: d.id };
+          }
+        });
+        if (foundByName) {
+          snapshot = {
+            empty: false,
+            forEach: (cb: any) => cb({ data: () => foundByName, id: foundByName.id })
+          } as any;
+        }
+      }
 
       if (snapshot.empty) {
-        setAuthError("No employee profile found with this Employee Number.");
+        setAuthError("No employee profile found with this Employee ID or Name.");
         setIsVerifying(false);
         return;
       }
 
       let matchedEmp: Employee | null = null;
-      snapshot.forEach((d) => {
+      snapshot.forEach((d: any) => {
         const data = d.data() as Employee;
         matchedEmp = { ...data, id: d.id };
       });
@@ -1697,9 +1815,8 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
         }
 
         setVerifiedEmployee(emp);
-        if (activePortalTab === "login") {
-          setActivePortalTab("timetracking");
-        }
+        setActivePortalTab("timetracking");
+
         await Promise.all([
           fetchEmployeeLeaves(emp.id || ""),
           fetchEmployeePayrolls(emp.id || "", emp.employeeNumber || ""),
@@ -1709,9 +1826,9 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
         // Reset PIN field after successful login
         setPortalPin("");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      setAuthError("Server verification error. Please retry later.");
+      setAuthError(err.message || "Server verification error. Please retry later.");
     } finally {
       setIsVerifying(false);
     }
@@ -1789,14 +1906,14 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
     if (!verifiedEmployee) return;
     const empStatus = verifiedEmployee.status || "Active";
     if (empStatus === "Inactive" || empStatus === "Resigned" || empStatus !== "Active") {
-      alert(`Access denied. Your employee account is marked as ${empStatus.toUpperCase()}.`);
+      showPunchToast("Access Denied", `Your employee account is marked as ${empStatus.toUpperCase()}.`, "error");
       setVerifiedEmployee(null);
       setActivePortalTab("login");
       return;
     }
 
     if (!reason.trim()) {
-      alert("Please designate a description or reason.");
+      showPunchToast("Missing Reason", "Please designate a description or reason.", "error");
       return;
     }
 
@@ -1812,14 +1929,18 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
     // 2-Month Accrual Paid Leave validation
     if (requestType === "Paid Leave") {
       if (!singleDate) {
-        alert("Please select a date for your Paid Leave.");
+        showPunchToast("Date Required", "Please select a date for your Paid Leave.", "error");
         setIsSubmitting(false);
         return;
       }
       const targetDateObj = new Date(singleDate);
       const metrics = getAccrualMetrics(verifiedEmployee.dateHired || "", existingPaidLeaves, targetDateObj);
       if (metrics.balance < 1) {
-        alert(`Request Denied: You do not have enough accrued paid leave balance for this period. You have accrued ${metrics.accrued} days of paid leave and used ${metrics.used} days in this 2-month block. Remaining balance: ${metrics.balance} days. Paid leave is accrued at a rate of 1 day per month and resets bimonthly.`);
+        showPunchToast(
+          "Insufficient Leave Balance",
+          `Accrued ${metrics.accrued}, used ${metrics.used}, remaining: ${metrics.balance} days (resets bimonthly).`,
+          "error"
+        );
         setIsSubmitting(false);
         return;
       }
@@ -1828,25 +1949,29 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
     // Birthday validation
     if (requestType === "Birthday Leave") {
       if (!verifiedEmployee.birthday) {
-        alert("Cannot submit Birthday Leave: You do not have a birthday registered in your profile. Please set your birthday first.");
+        showPunchToast("Birthday Missing", "Register your birthday in your profile before requesting Birthday Leave.", "error");
         setBirthdayInput("");
         setShowBirthdayModal(true);
         setIsSubmitting(false);
         return;
       }
       if (!singleDate) {
-        alert("Please select a date for your Birthday Leave.");
+        showPunchToast("Date Required", "Please select a date for your Birthday Leave.", "error");
         setIsSubmitting(false);
         return;
       }
       const bdayInfo = getBirthdayWeekInfo(verifiedEmployee.birthday, singleDate);
       if (!bdayInfo.isValid) {
-        alert(bdayInfo.explanation);
+        showPunchToast("Invalid Date", bdayInfo.explanation, "error");
         setIsSubmitting(false);
         return;
       }
       if (!bdayInfo.isInBirthdayWeek(singleDate)) {
-        alert(`Birthday Leave can only be scheduled and approved during your birthday week (${bdayInfo.weekStartMondayStr} to ${bdayInfo.weekEndFridayStr}). Your birthday is on ${bdayInfo.birthdayFormatted}.`);
+        showPunchToast(
+          "Outside Birthday Week",
+          `Allowed Monday ${bdayInfo.weekStartMondayStr} to Friday ${bdayInfo.weekEndFridayStr} (${bdayInfo.birthdayFormatted}).`,
+          "error"
+        );
         setIsSubmitting(false);
         return;
       }
@@ -1891,7 +2016,7 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
       setSingleDate("");
     } catch (err) {
       console.error(err);
-      alert("Error submitting request. Please try again.");
+      showPunchToast("Submission Error", "Error submitting request. Please try again.", "error");
     } finally {
       setIsSubmitting(false);
     }
@@ -1903,22 +2028,22 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
     if (!verifiedEmployee) return;
     const empStatus = verifiedEmployee.status || "Active";
     if (empStatus === "Inactive" || empStatus === "Resigned" || empStatus !== "Active") {
-      alert(`Access denied. Your employee account is marked as ${empStatus.toUpperCase()}.`);
+      showPunchToast("Access Denied", `Your employee account is marked as ${empStatus.toUpperCase()}.`, "error");
       setVerifiedEmployee(null);
       setActivePortalTab("login");
       return;
     }
 
     if (!attCopyStartDate || !attCopyEndDate) {
-      alert("Please select a date range.");
+      showPunchToast("Date Range Required", "Please select a start and end date range.", "error");
       return;
     }
     if (new Date(attCopyStartDate) > new Date(attCopyEndDate)) {
-      alert("Start Date cannot be after End Date.");
+      showPunchToast("Invalid Range", "Start Date cannot be after End Date.", "error");
       return;
     }
     if (!attCopyReason.trim()) {
-      alert("Please provide a reason for requesting attendance copy.");
+      showPunchToast("Reason Required", "Please provide a reason for requesting attendance copy.", "error");
       return;
     }
 
@@ -1957,7 +2082,7 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
       setAttCopyEndDate("");
     } catch (err) {
       console.error("Error submitting attendance copy request:", err);
-      alert("Failed to submit request. Please try again.");
+      showPunchToast("Submission Error", "Failed to submit request. Please try again.", "error");
     } finally {
       setIsSubmitting(false);
     }
@@ -2174,7 +2299,7 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
       doc.save(`Attendance_Report_${req.startDate}_to_${req.endDate}.pdf`);
     } catch (err) {
       console.error("Error generating attendance copy PDF:", err);
-      alert("Error generating PDF copy.");
+      showPunchToast("PDF Error", "Error generating PDF copy.", "error");
     }
   };
 
@@ -2185,7 +2310,7 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
       // 1. Fetch the request document from Firestore to get employeeId, startDate, endDate, etc.
       const requestDoc = await getDoc(doc(db, "attendance_copy_requests", notif.attendanceCopyRequestId));
       if (!requestDoc.exists()) {
-        alert("This attendance copy request record could not be found.");
+        showPunchToast("Record Missing", "This attendance copy request record could not be found.", "error");
         return;
       }
       const reqData = { ...requestDoc.data(), id: requestDoc.id } as AttendanceCopyRequest;
@@ -2199,10 +2324,10 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
         read: true
       });
 
-      alert("Attendance copy PDF downloaded successfully. Note: Each document copy is limited to a single-time secure download.");
+      showPunchToast("PDF Downloaded", "Attendance copy downloaded (limited to a single secure download).", "success");
     } catch (err) {
       console.error("Error downloading from notification:", err);
-      alert("Failed to download PDF. Please try again.");
+      showPunchToast("Download Failed", "Failed to download PDF. Please try again.", "error");
     } finally {
       setDownloadingNotifId(null);
     }
@@ -2295,7 +2420,7 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
     if (!file || !verifiedEmployee?.id) return;
     
     if (file.size > 1.5 * 1024 * 1024) {
-      alert("Image is too large. Image file must be under 1.5MB.");
+      showPunchToast("File Too Large", "Image file must be under 1.5MB.", "error");
       return;
     }
     
@@ -2309,10 +2434,10 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
           // Update local state
           const newPic = reader.result;
           setVerifiedEmployee(prev => prev ? { ...prev, profilePicture: newPic } : null);
-          alert("Your profile photo has been successfully uploaded and updated!");
+          showPunchToast("Photo Updated", "Your profile photo has been updated.", "success");
         } catch (err) {
           console.error("Error updating profile photo:", err);
-          alert("Could not update profile photo.");
+          showPunchToast("Upload Error", "Could not update profile photo.", "error");
         }
       }
     };
@@ -2320,7 +2445,7 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8 relative">
+    <div className="max-w-4xl mx-auto px-3 sm:px-4 py-6 sm:py-8 pb-28 md:pb-8 relative">
       {/* Real-time Non-Blocking Punch Toast (Zero OK button required) */}
       {punchToast && (
         <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[9999] w-[92%] max-w-md animate-in fade-in slide-in-from-top-4 duration-300 pointer-events-auto">
@@ -2373,7 +2498,7 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
       {/* Modernized Portal Header */}
       <header className="mb-6 space-y-4">
         {verifiedEmployee ? (
-          <div className="p-5 sm:p-6 bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-white/10 rounded-3xl shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="p-5 sm:p-6 bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-white/10 rounded-2xl sm:rounded-3xl shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
             <div className="flex items-center gap-3.5">
               <div className="relative shrink-0">
                 <img
@@ -2428,9 +2553,20 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
                 <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight truncate">
                   Hello, {verifiedEmployee.fullName.split(" ")[0]} 👋
                 </h1>
-                <p className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5 truncate">
-                  #{verifiedEmployee.employeeNumber} · {verifiedEmployee.position || "Graphic Designer"}
-                </p>
+                <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-mono truncate">
+                    #{verifiedEmployee.employeeNumber} · {verifiedEmployee.position || "Graphic Designer"}
+                  </p>
+                  {isEmployeeInTraining(verifiedEmployee) && (() => {
+                    const tp = getTrainingProgress(verifiedEmployee, getBusinessDate());
+                    return (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-mono font-extrabold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 uppercase">
+                        <GraduationCap className="w-3 h-3" />
+                        {tp.isExtended ? `Training Mo 2 · Wk ${tp.currentWeek}/8` : `Training · Wk ${tp.currentWeek}/4`}
+                      </span>
+                    );
+                  })()}
+                </div>
               </div>
             </div>
 
@@ -2664,7 +2800,7 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
                     <UserCheck className="w-6 h-6" />
                   </div>
                   <h3 className="font-bold text-lg text-zinc-850 dark:text-zinc-200">Employee Portal Login</h3>
-                  <p className="text-xs text-zinc-500 mt-1">Please enter your Employee Number and 4-digit PIN passcode.</p>
+                  <p className="text-xs text-zinc-500 mt-1">Please enter your Employee ID and 4-digit PIN passcode.</p>
                 </div>
 
                 {authError && (
@@ -2673,43 +2809,61 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
                     <span>{authError}</span>
                   </div>
                 )}
-                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-zinc-650 dark:text-zinc-400 font-mono">EMPLOYEE ID / NUMBER</label>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-zinc-650 dark:text-zinc-400 font-mono uppercase tracking-wider">EMPLOYEE ID</label>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. 003"
+                    placeholder="e.g. 000"
                     value={employeeNum}
                     onChange={(e) => setEmployeeNum(e.target.value)}
-                    className="w-full text-sm px-4 py-3 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-550 dark:text-zinc-100 uppercase text-center font-bold tracking-wider"
+                    className="w-full text-sm px-4 py-3 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-550 dark:text-zinc-100 text-center font-bold tracking-wider"
                   />
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-zinc-650 dark:text-zinc-400 font-mono">4-DIGIT PIN PASSCODE</label>
-                  <div className="relative">
-                    <input
-                      type={showPortalPin ? "text" : "password"}
-                      required
-                      maxLength={4}
-                      placeholder="e.g. 1234"
-                      value={portalPin}
-                      onChange={(e) => {
-                        const digits = e.target.value.replace(/\D/g, "");
-                        setPortalPin(digits);
-                      }}
-                      className="w-full text-sm px-4 py-3 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-550 dark:text-zinc-100 text-center font-bold tracking-widest font-mono"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPortalPin(!showPortalPin)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 text-xs font-mono font-bold"
-                    >
-                      {showPortalPin ? "HIDE" : "SHOW"}
-                    </button>
-                  </div>
-                  <p className="text-[10px] text-zinc-500 font-mono text-center mt-1">Default PIN is 1234. You can change this after logging in.</p>
-                </div>
+                {(() => {
+                  const isSuperAdminEmail =
+                    employeeNum.trim().toLowerCase() === "hr.oligarchmedia@gmail.com" ||
+                    employeeNum.trim().toLowerCase() === "oligarchmediaph@gmail.com" ||
+                    (settings?.adminEmail && employeeNum.trim().toLowerCase() === settings.adminEmail.toLowerCase());
+
+                  if (isSuperAdminEmail) {
+                    return (
+                      <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs rounded-xl flex items-center gap-2 font-mono animate-in fade-in duration-200">
+                        <Sparkles className="w-4 h-4 text-indigo-400 shrink-0" />
+                        <span>Identified as Super Admin. PIN passcode is not required.</span>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="space-y-1.5 animate-in fade-in duration-200">
+                      <label className="text-xs font-semibold text-zinc-650 dark:text-zinc-400 font-mono">4-DIGIT PIN PASSCODE</label>
+                      <div className="relative">
+                        <input
+                          type={showPortalPin ? "text" : "password"}
+                          required={!isSuperAdminEmail}
+                          maxLength={employeeNum.includes("@") ? 12 : 4}
+                          placeholder={employeeNum.includes("@") ? "Enter Admin PIN" : "e.g. 1234"}
+                          value={portalPin}
+                          onChange={(e) => {
+                            const digits = employeeNum.includes("@") ? e.target.value : e.target.value.replace(/\D/g, "");
+                            setPortalPin(digits);
+                          }}
+                          className="w-full text-sm px-4 py-3 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-550 dark:text-zinc-100 text-center font-bold tracking-widest font-mono"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPortalPin(!showPortalPin)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 text-xs font-mono font-bold cursor-pointer"
+                        >
+                          {showPortalPin ? "HIDE" : "SHOW"}
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-zinc-500 font-mono text-center mt-1">Default PIN is 1234. You can change this after logging in.</p>
+                    </div>
+                  );
+                })()}
 
                 <button
                   type="submit"
@@ -3016,9 +3170,9 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
                                   try {
                                     await updateDoc(doc(db, "employees", verifiedEmployee.id), { birthday: birthdayInput });
                                     setVerifiedEmployee(prev => prev ? { ...prev, birthday: birthdayInput } : null);
-                                    alert("Birthday successfully saved!");
+                                    showPunchToast("Birthday Saved", "Your eligible birthday week is now active.", "success");
                                   } catch (err: any) {
-                                    alert("Failed to save: " + err.message);
+                                    showPunchToast("Save Failed", err?.message || "Failed to save birthday.", "error");
                                   } finally {
                                     setIsSavingBirthday(false);
                                   }
@@ -3366,42 +3520,60 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
                 )}
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-zinc-650 dark:text-zinc-400 font-mono">EMPLOYEE ID / NUMBER</label>
+                  <label className="text-xs font-semibold text-zinc-650 dark:text-zinc-400 font-mono uppercase tracking-wider">EMPLOYEE ID</label>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. 003"
+                    placeholder="e.g. 000"
                     value={employeeNum}
                     onChange={(e) => setEmployeeNum(e.target.value)}
-                    className="w-full text-sm px-4 py-3 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-550 dark:text-zinc-100 uppercase text-center font-bold tracking-wider"
+                    className="w-full text-sm px-4 py-3 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-550 dark:text-zinc-100 text-center font-bold tracking-wider"
                   />
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-zinc-650 dark:text-zinc-400 font-mono">4-DIGIT PIN PASSCODE</label>
-                  <div className="relative">
-                    <input
-                      type={showPortalPin ? "text" : "password"}
-                      required
-                      maxLength={4}
-                      placeholder="e.g. 1234"
-                      value={portalPin}
-                      onChange={(e) => {
-                        const digits = e.target.value.replace(/\D/g, "");
-                        setPortalPin(digits);
-                      }}
-                      className="w-full text-sm px-4 py-3 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-550 dark:text-zinc-100 text-center font-bold tracking-widest font-mono"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPortalPin(!showPortalPin)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 text-xs font-mono font-bold"
-                    >
-                      {showPortalPin ? "HIDE" : "SHOW"}
-                    </button>
-                  </div>
-                  <p className="text-[10px] text-zinc-500 font-mono text-center mt-1">Default PIN is 1234. You can change this after logging in.</p>
-                </div>
+                {(() => {
+                  const isSuperAdminEmail =
+                    employeeNum.trim().toLowerCase() === "hr.oligarchmedia@gmail.com" ||
+                    employeeNum.trim().toLowerCase() === "oligarchmediaph@gmail.com" ||
+                    (settings?.adminEmail && employeeNum.trim().toLowerCase() === settings.adminEmail.toLowerCase());
+
+                  if (isSuperAdminEmail) {
+                    return (
+                      <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs rounded-xl flex items-center gap-2 font-mono animate-in fade-in duration-200">
+                        <Sparkles className="w-4 h-4 text-indigo-400 shrink-0" />
+                        <span>Identified as Super Admin. PIN passcode is not required.</span>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="space-y-1.5 animate-in fade-in duration-200">
+                      <label className="text-xs font-semibold text-zinc-650 dark:text-zinc-400 font-mono">4-DIGIT PIN PASSCODE</label>
+                      <div className="relative">
+                        <input
+                          type={showPortalPin ? "text" : "password"}
+                          required={!isSuperAdminEmail}
+                          maxLength={employeeNum.includes("@") ? 12 : 4}
+                          placeholder={employeeNum.includes("@") ? "Enter Admin PIN" : "e.g. 1234"}
+                          value={portalPin}
+                          onChange={(e) => {
+                            const digits = employeeNum.includes("@") ? e.target.value : e.target.value.replace(/\D/g, "");
+                            setPortalPin(digits);
+                          }}
+                          className="w-full text-sm px-4 py-3 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-550 dark:text-zinc-100 text-center font-bold tracking-widest font-mono"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPortalPin(!showPortalPin)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 text-xs font-mono font-bold cursor-pointer"
+                        >
+                          {showPortalPin ? "HIDE" : "SHOW"}
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-zinc-500 font-mono text-center mt-1">Default PIN is 1234. You can change this after logging in.</p>
+                    </div>
+                  );
+                })()}
 
                 <button
                   type="submit"
@@ -3609,6 +3781,12 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
                             Breakdown calculation
                           </p>
                           <div className="bg-white dark:bg-zinc-950 rounded-xl border border-zinc-150 dark:border-zinc-850 divide-y divide-zinc-100 dark:divide-zinc-850 text-xs text-zinc-800 dark:text-zinc-200 overflow-hidden shadow-xs">
+                            {(activePayStub.isTrainingPayroll || isEmployeeInTraining(verifiedEmployee)) && (
+                              <div className="px-4 py-2.5 bg-amber-50/80 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 text-[11px] font-mono font-bold flex items-center gap-1.5">
+                                <GraduationCap className="w-4 h-4 shrink-0" />
+                                <span>Training Program Voucher · Fixed ₱{(verifiedEmployee?.allowance || 5000).toLocaleString()}/mo Allowance Only · No OT</span>
+                              </div>
+                            )}
                             <div className="flex justify-between items-center px-4 py-3">
                               <span className="text-zinc-500">Regular Base Salary Package</span>
                               <span className="font-mono font-bold">
@@ -3618,14 +3796,18 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
                             
                             {(activePayStub.allowance || 0) > 0 && (
                               <div className="flex justify-between items-center px-4 py-3">
-                                <span className="text-zinc-500">Standard Allowance Components</span>
+                                <span className="text-zinc-500">
+                                  {(activePayStub.isTrainingPayroll || isEmployeeInTraining(verifiedEmployee))
+                                    ? "Fixed Training Allowance (Cutoff Share)"
+                                    : "Standard Allowance Components"}
+                                </span>
                                 <span className="font-mono text-green-600 font-bold">
                                   +{currency}{(activePayStub.allowance || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                 </span>
                               </div>
                             )}
 
-                            {(activePayStub.otPay || 0) > 0 && (
+                            {(activePayStub.otPay || 0) > 0 && !(activePayStub.isTrainingPayroll || isEmployeeInTraining(verifiedEmployee)) && (
                               <div className="flex justify-between items-center px-4 py-3">
                                 <span className="text-zinc-500">Calculated Overtime Premium</span>
                                 <span className="font-mono text-green-600 font-bold">
@@ -4023,64 +4205,90 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
               <>
               <form onSubmit={handleVerify} className="max-w-md mx-auto space-y-5 py-6" id="portal_time_tracking_verify_form">
                 <div className="text-center mb-6">
-                  <div className="w-12 h-12 rounded-full bg-blue-50 dark:bg-zinc-900 text-blue-600 dark:text-blue-400 flex items-center justify-center mx-auto mb-3">
+                  <div className="w-12 h-12 rounded-full bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mx-auto mb-3 shadow-inner ring-1 ring-indigo-500/20">
                     <Clock className="w-6 h-6" />
                   </div>
-                  <h3 className="font-bold text-lg text-zinc-850 dark:text-zinc-200">Employee Portal Login</h3>
-                  <p className="text-xs text-zinc-500 mt-1 font-sans">Please enter your Employee Number and 4-digit PIN passcode to access the clocking system.</p>
+                  <h3 className="font-bold text-lg text-zinc-850 dark:text-zinc-200">Studio Workplace Login</h3>
+                  <p className="text-xs text-zinc-500 mt-1 font-sans">
+                    Enter your Employee ID and 4-digit PIN passcode to access time tracking, devotion, and workplace records.
+                  </p>
                 </div>
 
                 {authError && (
-                  <div className="p-3 bg-red-50 dark:bg-red-955/20 text-red-750 dark:text-red-400 text-xs rounded-xl flex items-center gap-2 border border-red-100 dark:border-red-900/30 font-semibold">
+                  <div className="p-3 bg-red-50 dark:bg-red-955/20 text-red-750 dark:text-red-400 text-xs rounded-xl flex items-center gap-2 border border-red-100 dark:border-red-900/30 font-semibold font-mono">
                     <ShieldAlert className="w-4 h-4 shrink-0 text-red-500" />
                     <span>{authError}</span>
                   </div>
                 )}
                 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-zinc-650 dark:text-zinc-400 font-mono">EMPLOYEE ID / NUMBER</label>
+                  <label className="text-xs font-semibold text-zinc-650 dark:text-zinc-400 font-mono uppercase tracking-wider">
+                    EMPLOYEE ID
+                  </label>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. 003"
+                    placeholder="e.g. 000"
                     value={employeeNum}
                     onChange={(e) => setEmployeeNum(e.target.value)}
-                    className="w-full text-sm px-4 py-3 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-550 dark:text-zinc-100 uppercase text-center font-bold tracking-wider"
+                    className="w-full text-sm px-4 py-3 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:text-zinc-100 text-center font-bold tracking-wider"
                   />
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-zinc-650 dark:text-zinc-400 font-mono">4-DIGIT PIN PASSCODE</label>
-                  <div className="relative">
-                    <input
-                      type={showPortalPin ? "text" : "password"}
-                      required
-                      maxLength={4}
-                      placeholder="e.g. 1234"
-                      value={portalPin}
-                      onChange={(e) => {
-                        const digits = e.target.value.replace(/\D/g, "");
-                        setPortalPin(digits);
-                      }}
-                      className="w-full text-sm px-4 py-3 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-550 dark:text-zinc-100 text-center font-bold tracking-widest font-mono"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPortalPin(!showPortalPin)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 text-xs font-mono font-bold"
-                    >
-                      {showPortalPin ? "HIDE" : "SHOW"}
-                    </button>
-                  </div>
-                  <p className="text-[10px] text-zinc-500 font-mono text-center mt-1">Default PIN is 1234. You can change this after logging in.</p>
-                </div>
+                {(() => {
+                  const isSuperAdminEmail =
+                    employeeNum.trim().toLowerCase() === "hr.oligarchmedia@gmail.com" ||
+                    employeeNum.trim().toLowerCase() === "oligarchmediaph@gmail.com" ||
+                    (settings?.adminEmail && employeeNum.trim().toLowerCase() === settings.adminEmail.toLowerCase());
+
+                  if (isSuperAdminEmail) {
+                    return (
+                      <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs rounded-xl flex items-center gap-2 font-mono animate-in fade-in duration-200">
+                        <Sparkles className="w-4 h-4 text-indigo-400 shrink-0" />
+                        <span>Identified as Super Admin. PIN passcode is not required.</span>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="space-y-1.5 animate-in fade-in duration-200">
+                      <label className="text-xs font-semibold text-zinc-650 dark:text-zinc-400 font-mono">
+                        4-DIGIT PIN PASSCODE
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showPortalPin ? "text" : "password"}
+                          required={!isSuperAdminEmail}
+                          maxLength={employeeNum.includes("@") ? 12 : 4}
+                          placeholder={employeeNum.includes("@") ? "Enter Admin PIN" : "e.g. 1234"}
+                          value={portalPin}
+                          onChange={(e) => {
+                            const digits = employeeNum.includes("@") ? e.target.value : e.target.value.replace(/\D/g, "");
+                            setPortalPin(digits);
+                          }}
+                          className="w-full text-sm px-4 py-3 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:text-zinc-100 text-center font-bold tracking-widest font-mono"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPortalPin(!showPortalPin)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 text-xs font-mono font-bold cursor-pointer"
+                        >
+                          {showPortalPin ? "HIDE" : "SHOW"}
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-zinc-500 font-mono text-center mt-1">
+                        Default PIN is 1234. You can change this after logging in.
+                      </p>
+                    </div>
+                  );
+                })()}
 
                 <button
                   type="submit"
                   disabled={isVerifying}
-                  className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold py-3 px-4 rounded-xl text-sm shadow-sm transition-colors flex items-center justify-center gap-1 cursor-pointer font-sans"
+                  className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-400 text-white font-semibold py-3 px-4 rounded-xl text-sm shadow-md transition-colors flex items-center justify-center gap-1 cursor-pointer font-sans"
                 >
-                  {isVerifying ? "Logging in..." : "Login & Continue"}
+                  {isVerifying ? "Verifying & Accessing..." : "Login & Access Studio"}
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </form>
@@ -4202,6 +4410,49 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
                     </button>
                   </form>
                 )}
+
+                {/* TRAINING PROGRAM STATUS BANNER (IF IN TRAINING) */}
+                {verifiedEmployee && isEmployeeInTraining(verifiedEmployee) && (() => {
+                  const tp = getTrainingProgress(verifiedEmployee, getBusinessDate());
+                  return (
+                    <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-2.5">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                            <GraduationCap className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xs font-extrabold text-slate-900 dark:text-white uppercase font-mono">
+                                {tp.isExtended ? "Extended 2-Month Training (8 Weeks)" : "1-Month Training Program (4 Weeks)"}
+                              </span>
+                              <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-black bg-amber-500 text-slate-950 uppercase">
+                                Week {tp.currentWeek} of {tp.totalWeeks}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-slate-600 dark:text-slate-300 font-mono mt-0.5">
+                              {tp.startDate} → {tp.endDate} · {tp.isCompleted ? "Period Completed (Pending Admin Review)" : `${tp.daysRemaining} day(s) remaining`}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-left sm:text-right font-mono">
+                          <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300 block">
+                            Fixed ₱{(verifiedEmployee.allowance || 5000).toLocaleString()}/mo Allowance Only
+                          </span>
+                          <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                            No Overtime (OT Disabled) · Portal Login Active
+                          </span>
+                        </div>
+                      </div>
+                      <div className="w-full h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-amber-500 to-orange-500 transition-all duration-500"
+                          style={{ width: `${tp.progressPct}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* DEVOTION & PRAYER ROSTER WIDGET (12:00 AM ACTIVE) */}
                 {(() => {
@@ -4606,7 +4857,11 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
                             {todayAttendance.timeOut ? formatTo12Hour(todayAttendance.timeOut) : "In Progress"}
                           </span>
                           <span className="text-[10px] font-mono font-bold text-purple-600 dark:text-purple-400">
-                            {(todayAttendance?.otHours || 0) > 0 ? `+${(todayAttendance?.otHours || 0).toFixed(1)}h Overtime` : "Regular Shift"}
+                            {isEmployeeInTraining(verifiedEmployee)
+                              ? "Training Shift (No OT)"
+                              : (todayAttendance?.otHours || 0) > 0
+                              ? `+${(todayAttendance?.otHours || 0).toFixed(1)}h Overtime`
+                              : "Regular Shift"}
                           </span>
                         </div>
                       </div>
@@ -4779,6 +5034,7 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
                               <button
                                 type="button"
                                 onClick={() => {
+                                  setPortalSubstituteTargetSchedule(todaySched);
                                   setPortalSubstituteTargetRole(
                                     todaySched.devotionLeaderId === verifiedEmployee.id || todaySched.devotionLeaderName.toLowerCase().includes(verifiedEmployee.fullName.toLowerCase())
                                       ? "devotion"
@@ -4879,6 +5135,7 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
                         onOpenSubstituteModal={
                           verifiedEmployee
                             ? (sched, role) => {
+                                setPortalSubstituteTargetSchedule(sched);
                                 setPortalSubstituteTargetRole(role);
                                 setShowPortalSubstituteModal(true);
                               }
@@ -5085,6 +5342,7 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
                 <button
                   type="button"
                   onClick={() => {
+                    setPortalSubstituteTargetSchedule(assignedDevotionNotice.schedule);
                     setPortalSubstituteTargetRole(assignedDevotionNotice.isDevotionLeader ? "devotion" : "prayer");
                     setShowPortalSubstituteModal(true);
                   }}
@@ -5111,19 +5369,29 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
       )}
 
       {/* PORTAL SUBSTITUTE / REASSIGNMENT MODAL (IF EMPLOYEE IS ABSENT) */}
-      {showPortalSubstituteModal && assignedDevotionNotice && (
+      {showPortalSubstituteModal && (portalSubstituteTargetSchedule || assignedDevotionNotice?.schedule) && (() => {
+        const targetSchedule = portalSubstituteTargetSchedule || assignedDevotionNotice!.schedule;
+        return (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-zinc-950 border border-rose-500/40 rounded-2xl w-full max-w-md p-6 shadow-2xl relative space-y-4 animate-in fade-in duration-200">
             <div className="flex justify-between items-center border-b border-zinc-800 pb-3">
               <div className="flex items-center gap-2 text-rose-400">
                 <UserX className="w-5 h-5" />
-                <h3 className="text-base font-black text-white">
-                  Absent? Reassign Devotion Leader
-                </h3>
+                <div>
+                  <h3 className="text-base font-black text-white">
+                    Absent? Assign Substitute
+                  </h3>
+                  <p className="text-[11px] font-mono text-zinc-400">
+                    Shift Date: <strong className="text-amber-300">{targetSchedule.date}</strong>
+                  </p>
+                </div>
               </div>
               <button
                 type="button"
-                onClick={() => setShowPortalSubstituteModal(false)}
+                onClick={() => {
+                  setShowPortalSubstituteModal(false);
+                  setPortalSubstituteTargetSchedule(null);
+                }}
                 className="p-1 rounded-lg text-zinc-400 hover:text-white cursor-pointer"
               >
                 <X className="w-5 h-5" />
@@ -5131,7 +5399,7 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
             </div>
 
             <p className="text-xs text-zinc-400 leading-relaxed">
-              If you are absent, on leave, or cannot lead today's devotion, select a colleague from the team to substitute for you.
+              If you are absent, on leave, or cannot lead on <strong className="text-zinc-200">{targetSchedule.date}</strong>, choose a colleague to cover your role.
             </p>
 
             <form onSubmit={handlePortalSubmitSubstitute} className="space-y-4">
@@ -5190,7 +5458,10 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
               <div className="pt-2 flex justify-end gap-2.5">
                 <button
                   type="button"
-                  onClick={() => setShowPortalSubstituteModal(false)}
+                  onClick={() => {
+                    setShowPortalSubstituteModal(false);
+                    setPortalSubstituteTargetSchedule(null);
+                  }}
                   className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-mono font-semibold cursor-pointer"
                 >
                   Cancel
@@ -5206,7 +5477,8 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
             </form>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* PORTAL FLYER IMAGE VIEWER */}
       {isPortalImageViewerOpen && devotionSettings?.scheduleImageUrl && (
@@ -5343,9 +5615,9 @@ export default function Portal({ onLoginStateChange }: PortalProps = {}) {
                     await updateDoc(doc(db, "employees", verifiedEmployee.id), { birthday: birthdayInput });
                     setVerifiedEmployee(prev => prev ? { ...prev, birthday: birthdayInput } : null);
                     setShowBirthdayModal(false);
-                    alert("Birthday successfully updated!");
+                    showPunchToast("Birthday Updated", "Your birthday and leave week are now saved.", "success");
                   } catch (err: any) {
-                    alert("Failed to save birthday: " + err.message);
+                    showPunchToast("Update Failed", err?.message || "Failed to save birthday.", "error");
                   } finally {
                     setIsSavingBirthday(false);
                   }

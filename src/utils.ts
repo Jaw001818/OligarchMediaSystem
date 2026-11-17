@@ -1479,6 +1479,102 @@ export function calculateSalaryIncrease(newSalary: number, previousSalary: numbe
 }
 
 /**
+ * Checks whether an employee is currently in Training mode.
+ */
+export function isEmployeeInTraining(emp?: Partial<Employee> | null): boolean {
+  if (!emp) return false;
+  return emp.employmentType === "Training" || Boolean(emp.isTraining);
+}
+
+/**
+ * Computes inclusive Training End Date from start date and months (1 month = 4 weeks = 28 days).
+ */
+export function computeTrainingEndDate(startDateStr: string, months: 1 | 2 = 1): string {
+  const safeStart = /^\d{4}-\d{2}-\d{2}$/.test(startDateStr || "")
+    ? startDateStr
+    : new Date().toISOString().split("T")[0];
+  const [y, m, d] = safeStart.split("-").map(Number);
+  const dt = new Date(y, (m || 1) - 1, d || 1);
+  const totalDays = (months === 2 ? 2 : 1) * 28; // 1 month = 4 weeks (28 days), 2 months = 8 weeks (56 days)
+  dt.setDate(dt.getDate() + (totalDays - 1));
+  const pad2 = (n: number) => String(n).padStart(2, "0");
+  return `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}`;
+}
+
+export interface TrainingProgressInfo {
+  isTraining: boolean;
+  months: 1 | 2;
+  totalWeeks: 4 | 8;
+  totalDays: 28 | 56;
+  currentWeek: number;
+  currentDay: number;
+  daysElapsed: number;
+  daysRemaining: number;
+  startDate: string;
+  endDate: string;
+  progressPct: number;
+  isCompleted: boolean;
+  isExtended: boolean;
+}
+
+/**
+ * Returns live 4-week / 8-week training progress details (1 month = 4 weeks in total).
+ */
+export function getTrainingProgress(
+  emp?: Partial<Employee> | null,
+  referenceDateStr?: string
+): TrainingProgressInfo {
+  const inTraining = isEmployeeInTraining(emp);
+  const months: 1 | 2 = emp?.trainingMonths === 2 || emp?.trainingExtended ? 2 : 1;
+  const totalWeeks: 4 | 8 = months === 2 ? 8 : 4;
+  const totalDays: 28 | 56 = months === 2 ? 56 : 28;
+  const startDate =
+    (emp?.trainingStartDate && /^\d{4}-\d{2}-\d{2}$/.test(emp.trainingStartDate)
+      ? emp.trainingStartDate
+      : emp?.dateHired && /^\d{4}-\d{2}-\d{2}$/.test(emp.dateHired)
+      ? emp.dateHired
+      : new Date().toISOString().split("T")[0]);
+  const endDate =
+    emp?.trainingEndDate && /^\d{4}-\d{2}-\d{2}$/.test(emp.trainingEndDate)
+      ? emp.trainingEndDate
+      : computeTrainingEndDate(startDate, months);
+
+  const todayRef =
+    referenceDateStr && /^\d{4}-\d{2}-\d{2}$/.test(referenceDateStr)
+      ? referenceDateStr
+      : new Date().toISOString().split("T")[0];
+
+  const toMidnight = (s: string) => {
+    const [yy, mm, dd] = s.split("-").map(Number);
+    return new Date(yy, (mm || 1) - 1, dd || 1).getTime();
+  };
+
+  const diffDays = Math.floor((toMidnight(todayRef) - toMidnight(startDate)) / 86400000);
+  const daysElapsed = Math.max(0, Math.min(totalDays, diffDays + 1));
+  const currentDay = Math.max(1, Math.min(totalDays, diffDays + 1));
+  const currentWeek = Math.max(1, Math.min(totalWeeks, Math.ceil(currentDay / 7)));
+  const daysRemaining = Math.max(0, Math.floor((toMidnight(endDate) - toMidnight(todayRef)) / 86400000) + 1);
+  const progressPct = Math.max(0, Math.min(100, Math.round((daysElapsed / totalDays) * 100)));
+  const isCompleted = todayRef > endDate;
+
+  return {
+    isTraining: inTraining,
+    months,
+    totalWeeks,
+    totalDays,
+    currentWeek,
+    currentDay,
+    daysElapsed,
+    daysRemaining,
+    startDate,
+    endDate,
+    progressPct,
+    isCompleted,
+    isExtended: months === 2 || Boolean(emp?.trainingExtended)
+  };
+}
+
+/**
  * Resolves the precise employee salary, daily rate, allowance, and OT rate active
  * for any given date or cutoff period, honoring historical salary transitions so that
  * prior cutoffs and past 13th month computations are NEVER retroactively altered.
@@ -1487,20 +1583,23 @@ export function getEmployeeRateForDate(
   emp: Employee,
   targetDate: string
 ): EffectiveEmployeeRate {
-  const currentSalary = emp.salary || 0;
-  const currentDailyRate = emp.dailyRate || (currentSalary > 0 ? parseFloat((currentSalary / 22).toFixed(2)) : 0);
-  const currentAllowance = emp.allowance || 0;
-  const currentOtRate = emp.otRate || (currentDailyRate > 0 ? parseFloat((currentDailyRate / 8).toFixed(2)) : 0);
+  const inTraining = isEmployeeInTraining(emp);
+  const fixedTraineeAllowance = emp.allowance && emp.allowance > 0 ? emp.allowance : 5000;
+  const currentSalary = inTraining ? 0 : (emp.salary || 0);
+  const currentDailyRate = inTraining ? 0 : (emp.dailyRate || (currentSalary > 0 ? parseFloat((currentSalary / 22).toFixed(2)) : 0));
+  const currentAllowance = inTraining ? fixedTraineeAllowance : (emp.allowance || 0);
+  const currentOtRate = inTraining ? 0 : (emp.otRate || (currentDailyRate > 0 ? parseFloat((currentDailyRate / 8).toFixed(2)) : 0));
 
   const fallback: EffectiveEmployeeRate = {
     salary: currentSalary,
     dailyRate: currentDailyRate,
     allowance: currentAllowance,
     otRate: currentOtRate,
+    reason: inTraining ? "Training Period (Fixed ₱5,000/mo Allowance Only · No OT)" : undefined,
     isHistorical: false
   };
 
-  if (!emp.salaryHistory || emp.salaryHistory.length === 0) {
+  if (inTraining || !emp.salaryHistory || emp.salaryHistory.length === 0) {
     return fallback;
   }
 
@@ -1524,10 +1623,15 @@ export function getEmployeeRateForDate(
   }
 
   if (activeRecord) {
-    const s = activeRecord.salary || 0;
-    const d = activeRecord.dailyRate || (s > 0 ? parseFloat((s / 22).toFixed(2)) : currentDailyRate);
+    const isTrainingRec = activeRecord.salary === 0 && (activeRecord.reason?.toLowerCase().includes("training") ?? false);
+    const s = isTrainingRec ? 0 : (activeRecord.salary || 0);
+    const d = isTrainingRec
+      ? 0
+      : (activeRecord.dailyRate !== undefined ? activeRecord.dailyRate : (s > 0 ? parseFloat((s / 22).toFixed(2)) : 0));
     const a = activeRecord.allowance !== undefined ? activeRecord.allowance : currentAllowance;
-    const ot = activeRecord.otRate !== undefined ? activeRecord.otRate : parseFloat((d / 8).toFixed(2));
+    const ot = isTrainingRec
+      ? 0
+      : (activeRecord.otRate !== undefined ? activeRecord.otRate : (d > 0 ? parseFloat((d / 8).toFixed(2)) : 0));
     return {
       salary: s,
       dailyRate: d,
@@ -1560,11 +1664,12 @@ export function getEmployeeRateForDate(
 
   // If earlier than all entries, use the earliest historical entry
   if (earliest) {
+    const isTrainingEarliest = earliest.salary === 0 && (earliest.reason?.toLowerCase().includes("training") ?? false);
     return {
-      salary: earliest.salary,
-      dailyRate: earliest.dailyRate,
+      salary: isTrainingEarliest ? 0 : earliest.salary,
+      dailyRate: isTrainingEarliest ? 0 : earliest.dailyRate,
       allowance: earliest.allowance ?? currentAllowance,
-      otRate: earliest.otRate ?? currentOtRate,
+      otRate: isTrainingEarliest ? 0 : (earliest.otRate ?? currentOtRate),
       effectiveDate: earliest.effectiveDate,
       reason: earliest.reason,
       isHistorical: true,

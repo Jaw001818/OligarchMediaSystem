@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { db, handleFirestoreError, OperationType, collection, addDoc, doc, updateDoc, deleteDoc, query, where, getDocs, setDoc } from "../firebase";
 import { Employee, WeeklySchedule, DaySchedule, DayOfWeek, ScheduleOverride, Attendance, SalaryRateRecord } from "../types";
-import { formatTo12Hour, getEmployeeSchedule, getBusinessDate, DAYS_OF_WEEK, createDefaultWeeklySchedule, calculateAttendanceHours, getBirthdayWeekInfo, calculateSalaryIncrease, getEmployeeRateForDate } from "../utils";
+import { formatTo12Hour, getEmployeeSchedule, getBusinessDate, DAYS_OF_WEEK, createDefaultWeeklySchedule, calculateAttendanceHours, getBirthdayWeekInfo, calculateSalaryIncrease, getEmployeeRateForDate, computeTrainingEndDate, getTrainingProgress, isEmployeeInTraining } from "../utils";
 import { OFFICIAL_JOEMARIE_PANGAN } from "@/officialStaffBackup";
 import { 
   Plus, 
@@ -29,7 +29,8 @@ import {
   Copy,
   TrendingUp,
   History,
-  ArrowUpRight
+  ArrowUpRight,
+  GraduationCap
 } from "lucide-react";
 
 interface EmployeeManagerProps {
@@ -59,7 +60,11 @@ export default function EmployeeManager({ employees, onRefresh, isSuperAdmin, se
   const [phone, setPhone] = useState("");
   const [department, setDepartment] = useState("Graphic Design");
   const [position, setPosition] = useState("Graphic Designer");
-  const [employmentType, setEmploymentType] = useState<"Full-time" | "Part-time" | "Contract" | "Intern">("Full-time");
+  const [employmentType, setEmploymentType] = useState<"Full-time" | "Part-time" | "Contract" | "Intern" | "Training">("Full-time");
+  const [trainingMonths, setTrainingMonths] = useState<1 | 2>(1);
+  const [trainingStartDate, setTrainingStartDate] = useState(() => getBusinessDate());
+  const [trainingEndDate, setTrainingEndDate] = useState(() => computeTrainingEndDate(getBusinessDate(), 1));
+  const [trainingExtensionReason, setTrainingExtensionReason] = useState("");
   const [dateHired, setDateHired] = useState("");
   const [birthday, setBirthday] = useState("");
   const [quickBdayEmp, setQuickBdayEmp] = useState<Employee | null>(null);
@@ -72,6 +77,19 @@ export default function EmployeeManager({ employees, onRefresh, isSuperAdmin, se
   const [status, setStatus] = useState<"Active" | "Inactive" | "Resigned">("Active");
   const [isAdmin, setIsAdmin] = useState(false);
   const [pin, setPin] = useState("");
+
+  // Training Quick Action Modals (Extend to 2 Months / Graduate to Employee)
+  const [extendModalEmployee, setExtendModalEmployee] = useState<Employee | null>(null);
+  const [extendReasonInput, setExtendReasonInput] = useState("Needs additional 1-month (4-week) training before becoming a regular employee");
+  const [savingTrainingAction, setSavingTrainingAction] = useState(false);
+
+  const [graduateModalEmployee, setGraduateModalEmployee] = useState<Employee | null>(null);
+  const [gradEmploymentType, setGradEmploymentType] = useState<"Full-time" | "Part-time" | "Contract">("Full-time");
+  const [gradEffectiveDate, setGradEffectiveDate] = useState(() => getBusinessDate());
+  const [gradSalary, setGradSalary] = useState(18000);
+  const [gradAllowance, setGradAllowance] = useState(1500);
+  const [gradOtRate, setGradOtRate] = useState(112.5);
+  const [gradNotes, setGradNotes] = useState("Completed training and promoted to regular employee");
 
   // Salary rate history & designated cutoff transitions
   const [salaryHistory, setSalaryHistory] = useState<SalaryRateRecord[]>([]);
@@ -234,7 +252,8 @@ export default function EmployeeManager({ employees, onRefresh, isSuperAdmin, se
     }
   };
 
-  const openAddModal = () => {
+  const openAddModal = (presetAsTrainee: boolean = false) => {
+    const todayStr = getBusinessDate();
     setEditEmployee(null);
     setEmployeeNumber(getNextEmployeeNumber());
     setLastName("");
@@ -244,13 +263,17 @@ export default function EmployeeManager({ employees, onRefresh, isSuperAdmin, se
     setEmail("");
     setPhone("");
     setDepartment("Graphic Design");
-    setPosition("Graphic Designer");
-    setEmploymentType("Full-time");
-    setDateHired(new Date().toISOString().split("T")[0]);
+    setPosition(presetAsTrainee ? "Trainee Graphic Designer" : "Graphic Designer");
+    setEmploymentType(presetAsTrainee ? "Training" : "Full-time");
+    setTrainingMonths(1);
+    setTrainingStartDate(todayStr);
+    setTrainingEndDate(computeTrainingEndDate(todayStr, 1));
+    setTrainingExtensionReason("");
+    setDateHired(todayStr);
     setBirthday("1995-01-01");
-    setSalary(18000);
-    setAllowance(1500);
-    setOtRate(112.5);
+    setSalary(presetAsTrainee ? 0 : 18000);
+    setAllowance(presetAsTrainee ? 5000 : 1500);
+    setOtRate(presetAsTrainee ? 0 : 112.5);
     setProfilePicture("");
     setStatus("Active");
     setIsAdmin(false);
@@ -263,9 +286,9 @@ export default function EmployeeManager({ employees, onRefresh, isSuperAdmin, se
     setScheduleNotes("");
     setSalaryHistory([]);
     setShowAddRateForm(false);
-    setNewRateSalary(18000);
-    setNewRateAllowance(1500);
-    setNewRateEffectiveDate(getBusinessDate());
+    setNewRateSalary(presetAsTrainee ? 0 : 18000);
+    setNewRateAllowance(presetAsTrainee ? 5000 : 1500);
+    setNewRateEffectiveDate(todayStr);
     setNewRateCutoffName("");
     setNewRateReason("Designated Cutoff Salary Adjustment");
     setIsOpen(true);
@@ -373,12 +396,19 @@ export default function EmployeeManager({ employees, onRefresh, isSuperAdmin, se
     setPhone(emp.phone);
     setDepartment(emp.department || "Graphic Design");
     setPosition(emp.position || "Graphic Designer");
-    setEmploymentType(emp.employmentType);
+    const isTrainee = isEmployeeInTraining(emp);
+    setEmploymentType(isTrainee ? "Training" : emp.employmentType);
+    const tMonths: 1 | 2 = emp.trainingMonths === 2 || emp.trainingExtended ? 2 : 1;
+    const tStart = emp.trainingStartDate || emp.dateHired || getBusinessDate();
+    setTrainingMonths(tMonths);
+    setTrainingStartDate(tStart);
+    setTrainingEndDate(emp.trainingEndDate || computeTrainingEndDate(tStart, tMonths));
+    setTrainingExtensionReason(emp.trainingExtensionReason || "");
     setDateHired(emp.dateHired);
     setBirthday(emp.birthday);
-    setSalary(emp.salary);
-    setAllowance(emp.allowance);
-    setOtRate(emp.otRate);
+    setSalary(isTrainee ? 0 : emp.salary);
+    setAllowance(isTrainee ? (emp.allowance || 5000) : emp.allowance);
+    setOtRate(isTrainee ? 0 : emp.otRate);
     setProfilePicture(emp.profilePicture || "");
     setStatus(emp.status);
     setIsAdmin(emp.isAdmin || false);
@@ -827,7 +857,8 @@ export default function EmployeeManager({ employees, onRefresh, isSuperAdmin, se
     }
 
     const finalFullName = `${lastName.trim()}, ${firstName.trim()}${middleName.trim() ? " " + middleName.trim() : ""}`;
-    const defaultPosition = "Graphic Designer";
+    const isTrainingMode = employmentType === "Training";
+    const defaultPosition = isTrainingMode ? "Trainee Graphic Designer" : "Graphic Designer";
     const defaultDepartment = "Graphic Design";
 
     // Check for employeeNumber uniqueness (excluding the current editing employee)
@@ -848,6 +879,11 @@ export default function EmployeeManager({ employees, onRefresh, isSuperAdmin, se
       return;
     }
 
+    const effectiveTrainingStart = trainingStartDate || dateHired || getBusinessDate();
+    const effectiveTrainingMonths: 1 | 2 = trainingMonths === 2 ? 2 : 1;
+    const effectiveTrainingEnd = computeTrainingEndDate(effectiveTrainingStart, effectiveTrainingMonths);
+    const traineeFixedAllowance = (parseFloat(allowance.toString()) || 0) > 0 ? parseFloat(allowance.toString()) : 5000;
+
     setSaving(true);
     const payload: any = {
       employeeNumber: trimmedEmpNum,
@@ -860,12 +896,18 @@ export default function EmployeeManager({ employees, onRefresh, isSuperAdmin, se
       department: defaultDepartment,
       position: defaultPosition,
       employmentType,
+      isTraining: isTrainingMode,
+      trainingMonths: isTrainingMode ? effectiveTrainingMonths : null,
+      trainingStartDate: isTrainingMode ? effectiveTrainingStart : (editEmployee?.trainingStartDate || null),
+      trainingEndDate: isTrainingMode ? effectiveTrainingEnd : (editEmployee?.trainingEndDate || null),
+      trainingExtended: isTrainingMode ? effectiveTrainingMonths === 2 : (editEmployee?.trainingExtended || false),
+      trainingExtensionReason: isTrainingMode && effectiveTrainingMonths === 2 ? trainingExtensionReason.trim() : (editEmployee?.trainingExtensionReason || ""),
       dateHired,
       birthday,
-      salary: parseFloat(salary.toString()) || 0,
-      dailyRate: calculatedDailyRate,
-      allowance: parseFloat(allowance.toString()) || 0,
-      otRate: parseFloat(otRate.toString()) || 0,
+      salary: isTrainingMode ? 0 : (parseFloat(salary.toString()) || 0),
+      dailyRate: isTrainingMode ? 0 : calculatedDailyRate,
+      allowance: isTrainingMode ? traineeFixedAllowance : (parseFloat(allowance.toString()) || 0),
+      otRate: isTrainingMode ? 0 : (parseFloat(otRate.toString()) || 0),
       salaryHistory: salaryHistory || [],
       profilePicture: (profilePicture || "").trim() || `https://ui-avatars.com/api/?name=${encodeURIComponent(finalFullName)}&background=3B82F6&color=fff`,
       status,
@@ -1010,14 +1052,149 @@ export default function EmployeeManager({ employees, onRefresh, isSuperAdmin, se
   const toggleArchiveStatus = async (emp: Employee) => {
     if (!emp.id) return;
     const nextStatus = emp.status === "Active" ? "Inactive" : "Active";
-    if (!confirm(`Are you sure you want to set status of ${emp.fullName} to [${nextStatus}]?`)) return;
+    triggerConfirm(
+      "Update Employee Status",
+      `Are you sure you want to set status of ${emp.fullName} to [${nextStatus}]?`,
+      async () => {
+        try {
+          const docRef = doc(db, "employees", emp.id!);
+          await updateDoc(docRef, { status: nextStatus });
+          onRefresh();
+          triggerToast(`${emp.fullName} is now ${nextStatus}.`);
+        } catch (err) {
+          console.error(err);
+          triggerToast("Failed to update employee status.");
+        }
+      }
+    );
+  };
 
+  // Extend Trainee to 2 Months (8 Weeks / 56 Days total)
+  const handleConfirmExtendTraining = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!extendModalEmployee?.id) return;
     try {
-      const docRef = doc(db, "employees", emp.id);
-      await updateDoc(docRef, { status: nextStatus });
+      setSavingTrainingAction(true);
+      const startStr = extendModalEmployee.trainingStartDate || extendModalEmployee.dateHired || getBusinessDate();
+      const newEndDate = computeTrainingEndDate(startStr, 2);
+      await updateDoc(doc(db, "employees", extendModalEmployee.id), {
+        employmentType: "Training",
+        isTraining: true,
+        trainingMonths: 2,
+        trainingStartDate: startStr,
+        trainingEndDate: newEndDate,
+        trainingExtended: true,
+        trainingExtensionReason: extendReasonInput.trim() || "Extended to 2 months (8 weeks) for additional training",
+        salary: 0,
+        dailyRate: 0,
+        otRate: 0,
+        allowance: extendModalEmployee.allowance && extendModalEmployee.allowance > 0 ? extendModalEmployee.allowance : 5000,
+        updatedAt: Date.now()
+      });
+      await addDoc(collection(db, "audit_logs"), {
+        user: "Admin",
+        action: "Training Extended to 2 Months (8 Weeks)",
+        details: `Extended ${extendModalEmployee.fullName} (#${extendModalEmployee.employeeNumber}) training from 4 weeks to 8 weeks (ends ${newEndDate}). Reason: ${extendReasonInput.trim() || "Needs more training"}`,
+        timestamp: new Date().toISOString()
+      });
+      triggerToast(`${extendModalEmployee.fullName} extended to 2 Months (8 Weeks · Ends ${newEndDate}).`);
+      setExtendModalEmployee(null);
       onRefresh();
     } catch (err) {
       console.error(err);
+      triggerToast("Failed to extend training duration.");
+    } finally {
+      setSavingTrainingAction(false);
+    }
+  };
+
+  // Open Graduate Trainee Modal
+  const openGraduateModal = (emp: Employee) => {
+    setGraduateModalEmployee(emp);
+    setGradEmploymentType("Full-time");
+    setGradEffectiveDate(getBusinessDate());
+    setGradSalary(18000);
+    setGradAllowance(1500);
+    setGradOtRate(112.5);
+    setGradNotes(`Completed ${emp.trainingMonths === 2 ? "2-month (8-week)" : "1-month (4-week)"} training and promoted to New Employee`);
+  };
+
+  // Graduate Trainee to Regular Employee (preserves training cutoff rates in salaryHistory)
+  const handleConfirmGraduateTrainee = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!graduateModalEmployee?.id) return;
+    if (!gradSalary || gradSalary <= 0) {
+      triggerToast("Please enter a valid Monthly Basic Salary for the new employee.");
+      return;
+    }
+    try {
+      setSavingTrainingAction(true);
+      const tStart = graduateModalEmployee.trainingStartDate || graduateModalEmployee.dateHired || getBusinessDate();
+      const traineeAllowance = graduateModalEmployee.allowance && graduateModalEmployee.allowance > 0 ? graduateModalEmployee.allowance : 5000;
+      const existingHistory: SalaryRateRecord[] = Array.isArray(graduateModalEmployee.salaryHistory) ? [...graduateModalEmployee.salaryHistory] : [];
+
+      const hasTrainingBaseline = existingHistory.some(
+        (r) => r.salary === 0 && (r.reason?.toLowerCase().includes("training") ?? false)
+      );
+      if (!hasTrainingBaseline) {
+        existingHistory.push({
+          id: `rate-training-${Date.now() - 1}`,
+          effectiveDate: tStart < gradEffectiveDate ? tStart : "2025-01-01",
+          salary: 0,
+          dailyRate: 0,
+          allowance: traineeAllowance,
+          otRate: 0,
+          reason: `Training Period (${graduateModalEmployee.trainingMonths === 2 ? "2 Months / 8 Wks" : "1 Month / 4 Wks"} · Fixed ₱${traineeAllowance.toLocaleString()}/mo Allowance · No OT)`,
+          createdAt: new Date().toISOString()
+        });
+      }
+
+      const newDaily = parseFloat((gradSalary / 20).toFixed(2));
+      const newOt = gradOtRate > 0 ? gradOtRate : parseFloat(((gradSalary / 20) / 8).toFixed(2));
+      existingHistory.push({
+        id: `rate-graduated-${Date.now()}`,
+        effectiveDate: gradEffectiveDate,
+        salary: gradSalary,
+        dailyRate: newDaily,
+        allowance: gradAllowance,
+        otRate: newOt,
+        previousSalary: 0,
+        increaseAmount: gradSalary,
+        increasePercentage: 100,
+        reason: gradNotes.trim() || "Graduated from Training to Regular Employee",
+        createdAt: new Date().toISOString()
+      });
+
+      const sortedHistory = existingHistory.sort((a, b) => a.effectiveDate.localeCompare(b.effectiveDate));
+
+      await updateDoc(doc(db, "employees", graduateModalEmployee.id), {
+        employmentType: gradEmploymentType,
+        position: "Graphic Designer",
+        isTraining: false,
+        trainingGraduatedDate: gradEffectiveDate,
+        salary: gradSalary,
+        dailyRate: newDaily,
+        allowance: gradAllowance,
+        otRate: newOt,
+        salaryHistory: sortedHistory,
+        updatedAt: Date.now()
+      });
+
+      await addDoc(collection(db, "audit_logs"), {
+        user: "Admin",
+        action: "Trainee Promoted to New Employee",
+        details: `${graduateModalEmployee.fullName} (#${graduateModalEmployee.employeeNumber}) graduated from Training to ${gradEmploymentType} effective ${gradEffectiveDate} (Salary: ₱${gradSalary.toLocaleString()}/mo, Allowance: ₱${gradAllowance.toLocaleString()}/mo).`,
+        timestamp: new Date().toISOString()
+      });
+
+      triggerToast(`${graduateModalEmployee.fullName} is now a regular ${gradEmploymentType} employee!`);
+      setGraduateModalEmployee(null);
+      onRefresh();
+    } catch (err) {
+      console.error(err);
+      triggerToast("Failed to graduate trainee.");
+    } finally {
+      setSavingTrainingAction(false);
     }
   };
 
@@ -1050,19 +1227,29 @@ export default function EmployeeManager({ employees, onRefresh, isSuperAdmin, se
       (emp.employeeNumber || "").toLowerCase().includes(search.toLowerCase()) ||
       (emp.position || "").toLowerCase().includes(search.toLowerCase());
     
-    const matchesDept = filterDept === "All" || emp.department === filterDept;
+    const matchesDept =
+      filterDept === "All" ||
+      (filterDept === "TrainingOnly" ? isEmployeeInTraining(emp) : emp.department === filterDept);
     const matchesStatus = filterStatus === "All" || emp.status === filterStatus;
 
     return matchesSearch && matchesDept && matchesStatus;
   });
 
+  const activeTraineeCount = employees.filter((e) => isEmployeeInTraining(e) && e.status === "Active").length;
   const uniqueDepts = Array.from(new Set(employees.map(e => e.department)));
 
   return (
     <div className="space-y-6 w-full min-w-0">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-xl font-bold text-zinc-900 dark:text-white tracking-tight">Staff Listing Directory</h2>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="text-xl font-bold text-zinc-900 dark:text-white tracking-tight">Staff Listing Directory</h2>
+            {activeTraineeCount > 0 && (
+              <span className="px-2 py-0.5 text-[10px] font-mono font-bold rounded-full bg-amber-100 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border border-amber-300/70 dark:border-amber-800/60 flex items-center gap-1">
+                <GraduationCap className="w-3 h-3" /> {activeTraineeCount} In Training
+              </span>
+            )}
+          </div>
           <p className="text-xs text-zinc-500 mt-1 font-mono">Total tracked: {filteredEmployees.length} profiles matched</p>
         </div>
         <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
@@ -1094,7 +1281,15 @@ export default function EmployeeManager({ employees, onRefresh, isSuperAdmin, se
             <UserPlus className="w-3.5 h-3.5" /> Quick Add (Name Only / 2025 Staff)
           </button>
           <button
-            onClick={openAddModal}
+            type="button"
+            onClick={() => openAddModal(true)}
+            className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold py-2.5 px-3.5 rounded-xl text-xs transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+            title="Create a new 1-Month (4 Weeks) Trainee with Fixed ₱5,000/month Allowance Only & No OT"
+          >
+            <GraduationCap className="w-4 h-4" /> Add Trainee (1-Mo / 4 Wks)
+          </button>
+          <button
+            onClick={() => openAddModal(false)}
             className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-4 rounded-xl text-sm transition-all shadow-sm flex items-center gap-2 cursor-pointer"
           >
             <Plus className="w-4 h-4" /> Add Employee Profile
@@ -1103,7 +1298,7 @@ export default function EmployeeManager({ employees, onRefresh, isSuperAdmin, se
       </div>
 
       {/* Filter and Search Action Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="relative">
           <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-3.5" />
           <input
@@ -1113,6 +1308,20 @@ export default function EmployeeManager({ employees, onRefresh, isSuperAdmin, se
             onChange={(e) => setSearch(e.target.value)}
             className="w-full text-xs pl-9 pr-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-550 dark:text-zinc-100"
           />
+        </div>
+
+        <div>
+          <select
+            value={filterDept}
+            onChange={(e) => setFilterDept(e.target.value)}
+            className="w-full text-xs px-3 py-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none dark:text-zinc-100"
+          >
+            <option value="All">All Roles & Programs</option>
+            <option value="TrainingOnly">🎓 Trainees Only (1–2 Mos)</option>
+            {uniqueDepts.map((d) => (
+              <option key={d} value={d}>{d}</option>
+            ))}
+          </select>
         </div>
 
         <div>
@@ -1210,9 +1419,28 @@ export default function EmployeeManager({ employees, onRefresh, isSuperAdmin, se
                     </td>
 
                     <td className="py-3.5 px-4 font-mono">
-                      <span className="px-2 py-0.5 bg-zinc-100 dark:bg-zinc-800 rounded text-[10px] font-bold text-zinc-750 dark:text-zinc-300">
-                        {emp.employmentType}
-                      </span>
+                      {isEmployeeInTraining(emp) ? (() => {
+                        const tp = getTrainingProgress(emp, getBusinessDate());
+                        return (
+                          <div className="space-y-1">
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold border ${
+                              tp.isExtended
+                                ? "bg-orange-50 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300 border-orange-300 dark:border-orange-800/60"
+                                : "bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-800/60"
+                            }`}>
+                              <GraduationCap className="w-3 h-3 shrink-0" />
+                              {tp.isExtended ? "Training · 2 Mos (8 Wks)" : "Training · 1 Mo (4 Wks)"}
+                            </span>
+                            <div className="text-[9px] text-zinc-500 dark:text-zinc-400">
+                              Wk {tp.currentWeek}/{tp.totalWeeks} · {tp.isCompleted ? "Period Ended" : `${tp.daysRemaining}d left`} (Ends {tp.endDate})
+                            </div>
+                          </div>
+                        );
+                      })() : (
+                        <span className="px-2 py-0.5 bg-zinc-100 dark:bg-zinc-800 rounded text-[10px] font-bold text-zinc-750 dark:text-zinc-300">
+                          {emp.employmentType}
+                        </span>
+                      )}
                     </td>
 
                     {/* Assigned Work Schedule */}
@@ -1259,18 +1487,34 @@ export default function EmployeeManager({ employees, onRefresh, isSuperAdmin, se
 
                     {/* Basic rate */}
                     <td className="py-3.5 px-4 font-mono text-right font-bold text-zinc-800 dark:text-zinc-200">
-                      <div>₱{(emp.salary ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
-                      <span className="block text-[10px] font-normal text-zinc-450 dark:text-zinc-500 font-mono">₱{emp.dailyRate || 0}/day</span>
-                      {emp.salaryHistory && emp.salaryHistory.length > 0 && (
-                        <div className="mt-1 flex items-center justify-end gap-1">
-                          <span 
-                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-800/40"
-                            title={`Has ${emp.salaryHistory.length} designated salary transition records`}
-                          >
-                            <TrendingUp className="w-2.5 h-2.5" />
-                            {emp.salaryHistory.length} rate tier{emp.salaryHistory.length > 1 ? "s" : ""}
+                      {isEmployeeInTraining(emp) ? (
+                        <div>
+                          <div className="text-amber-600 dark:text-amber-400">
+                            ₱{(emp.allowance || 5000).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                          </div>
+                          <span className="block text-[10px] font-normal text-zinc-500 dark:text-zinc-400">
+                            Fixed Allowance/mo · No OT
+                          </span>
+                          <span className="block text-[9px] font-normal text-zinc-400">
+                            ₱{((emp.allowance || 5000) / 2).toLocaleString()}/cutoff · Basic ₱0
                           </span>
                         </div>
+                      ) : (
+                        <>
+                          <div>₱{(emp.salary ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                          <span className="block text-[10px] font-normal text-zinc-450 dark:text-zinc-500 font-mono">₱{emp.dailyRate || 0}/day</span>
+                          {emp.salaryHistory && emp.salaryHistory.length > 0 && (
+                            <div className="mt-1 flex items-center justify-end gap-1">
+                              <span 
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-800/40"
+                                title={`Has ${emp.salaryHistory.length} designated salary transition records`}
+                              >
+                                <TrendingUp className="w-2.5 h-2.5" />
+                                {emp.salaryHistory.length} rate tier{emp.salaryHistory.length > 1 ? "s" : ""}
+                              </span>
+                            </div>
+                          )}
+                        </>
                       )}
                     </td>
 
@@ -1289,39 +1533,67 @@ export default function EmployeeManager({ employees, onRefresh, isSuperAdmin, se
 
                     {/* Action buttons list */}
                     <td className="py-3.5 px-4 text-center">
-                      <div className="flex items-center justify-center gap-1.5">
-                        <button
-                          onClick={() => openShiftChangeModal(emp)}
-                          className="p-1 px-1.5 text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/20 border border-amber-300 dark:border-amber-800/40 rounded-lg transition-colors cursor-pointer"
-                          title="Real-Time Shift Change / Override Today"
-                        >
-                          <Zap className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
-                        </button>
-                        <button
-                          onClick={() => openEditModal(emp)}
-                          className="p-1 px-1.5 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 dark:text-zinc-450 dark:hover:text-zinc-200 dark:hover:bg-zinc-800 rounded-lg transition-colors border border-zinc-200 dark:border-zinc-800 cursor-pointer"
-                          title="Edit Profile & Schedule"
-                        >
-                          <Edit className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => toggleArchiveStatus(emp)}
-                          className={`p-1 px-1.5 rounded-lg border transition-colors cursor-pointer ${
-                            emp.status === "Active"
-                              ? "text-yellow-600 border-yellow-250 hover:bg-yellow-50 dark:border-yellow-900/30"
-                              : "text-green-600 border-green-250 hover:bg-green-50 dark:border-green-900/30"
-                          }`}
-                          title={emp.status === "Active" ? "Set Inactive" : "Set Active"}
-                        >
-                          {emp.status === "Active" ? <Archive className="w-3.5 h-3.5" /> : <UserCheck className="w-3.5 h-3.5" />}
-                        </button>
-                        <button
-                          onClick={() => handleDeleteEmployee(emp)}
-                          className="p-1 px-1.5 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20 border border-red-250 dark:border-red-900/30 rounded-lg transition-colors cursor-pointer"
-                          title="Delete Employee Permanently"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                      <div className="flex flex-col items-center gap-1.5">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            onClick={() => openShiftChangeModal(emp)}
+                            className="p-1 px-1.5 text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/20 border border-amber-300 dark:border-amber-800/40 rounded-lg transition-colors cursor-pointer"
+                            title="Real-Time Shift Change / Override Today"
+                          >
+                            <Zap className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
+                          </button>
+                          <button
+                            onClick={() => openEditModal(emp)}
+                            className="p-1 px-1.5 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 dark:text-zinc-450 dark:hover:text-zinc-200 dark:hover:bg-zinc-800 rounded-lg transition-colors border border-zinc-200 dark:border-zinc-800 cursor-pointer"
+                            title="Edit Profile & Schedule"
+                          >
+                            <Edit className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => toggleArchiveStatus(emp)}
+                            className={`p-1 px-1.5 rounded-lg border transition-colors cursor-pointer ${
+                              emp.status === "Active"
+                                ? "text-yellow-600 border-yellow-250 hover:bg-yellow-50 dark:border-yellow-900/30"
+                                : "text-green-600 border-green-250 hover:bg-green-50 dark:border-green-900/30"
+                            }`}
+                            title={emp.status === "Active" ? "Set Inactive" : "Set Active"}
+                          >
+                            {emp.status === "Active" ? <Archive className="w-3.5 h-3.5" /> : <UserCheck className="w-3.5 h-3.5" />}
+                          </button>
+                          <button
+                            onClick={() => handleDeleteEmployee(emp)}
+                            className="p-1 px-1.5 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20 border border-red-250 dark:border-red-900/30 rounded-lg transition-colors cursor-pointer"
+                            title="Delete Employee Permanently"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        {isEmployeeInTraining(emp) && (
+                          <div className="flex items-center justify-center gap-1 flex-wrap">
+                            {emp.trainingMonths !== 2 && !emp.trainingExtended && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setExtendModalEmployee(emp);
+                                  setExtendReasonInput("Needs 1 extra month (8 weeks total) to learn before becoming regular employee");
+                                }}
+                                className="px-2 py-0.5 text-[9px] font-mono font-bold rounded-md bg-orange-50 hover:bg-orange-100 dark:bg-orange-950/40 dark:hover:bg-orange-900/50 text-orange-700 dark:text-orange-300 border border-orange-300 dark:border-orange-800 cursor-pointer transition-colors"
+                                title="Extend training to 2 Months (8 Weeks total) if trainee needs more time to learn"
+                              >
+                                +1 Mo (8 Wks)
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => openGraduateModal(emp)}
+                              className="px-2 py-0.5 text-[9px] font-mono font-bold rounded-md bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 cursor-pointer transition-colors flex items-center gap-0.5"
+                              title="Graduate trainee to regular employee"
+                            >
+                              <GraduationCap className="w-2.5 h-2.5" /> Graduate
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -1437,13 +1709,29 @@ export default function EmployeeManager({ employees, onRefresh, isSuperAdmin, se
                   <label className="text-[10px] font-bold text-zinc-500 font-mono tracking-wider">EMPLOYMENT TYPE</label>
                   <select
                     value={employmentType}
-                    onChange={(e) => setEmploymentType(e.target.value as any)}
+                    onChange={(e) => {
+                      const nextType = e.target.value as any;
+                      setEmploymentType(nextType);
+                      if (nextType === "Training") {
+                        const startStr = trainingStartDate || dateHired || getBusinessDate();
+                        setTrainingStartDate(startStr);
+                        setTrainingEndDate(computeTrainingEndDate(startStr, trainingMonths));
+                        setSalary(0);
+                        setOtRate(0);
+                        setAllowance(5000);
+                      } else if (employmentType === "Training" && salary === 0) {
+                        setSalary(18000);
+                        setOtRate(112.5);
+                        setAllowance(1500);
+                      }
+                    }}
                     className="w-full text-xs px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-808 rounded-lg outline-none dark:text-zinc-100 font-mono"
                   >
                     <option value="Full-time">Full-time</option>
                     <option value="Part-time">Part-time</option>
                     <option value="Contract">Contract</option>
                     <option value="Intern">Intern</option>
+                    <option value="Training">Training (1–2 Mos · ₱5k Fixed Allowance Only · No OT)</option>
                   </select>
                 </div>
 
@@ -1453,7 +1741,14 @@ export default function EmployeeManager({ employees, onRefresh, isSuperAdmin, se
                     type="date"
                     required
                     value={dateHired}
-                    onChange={(e) => setDateHired(e.target.value)}
+                    onChange={(e) => {
+                      const nextD = e.target.value;
+                      setDateHired(nextD);
+                      if (employmentType === "Training") {
+                        setTrainingStartDate(nextD);
+                        setTrainingEndDate(computeTrainingEndDate(nextD, trainingMonths));
+                      }
+                    }}
                     className="w-full text-xs px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-808 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-550 dark:text-zinc-50"
                   />
                 </div>
@@ -1492,18 +1787,131 @@ export default function EmployeeManager({ employees, onRefresh, isSuperAdmin, se
                     <option value="Resigned">Resigned</option>
                   </select>
                   <p className="text-[10px] font-mono leading-tight mt-1 text-zinc-500 dark:text-zinc-400">
-                    {status === "Active" && "✓ Active: Employee has full portal, clocking, and account access."}
+                    {status === "Active" && "✓ Active: Employee has full portal, clocking, and account access (including Trainees)."}
                     {status === "Inactive" && "🔒 Inactive: Account access locked. Employee cannot log in or clock in."}
                     {status === "Resigned" && "🚫 Resigned: Account permanently revoked and hidden from daily punch cards."}
                   </p>
                 </div>
               </div>
 
+              {/* Training Program Panel (Visible when Training Mode is selected) */}
+              {employmentType === "Training" && (
+                <div className="bg-amber-50/80 dark:bg-amber-950/20 border border-amber-300/80 dark:border-amber-800/60 rounded-xl p-4 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <GraduationCap className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                      <div>
+                        <h4 className="text-[11px] font-extrabold text-amber-900 dark:text-amber-300 font-mono uppercase tracking-wider">
+                          Training Program Schedule (1 Month = 4 Weeks Total)
+                        </h4>
+                        <p className="text-[10px] text-amber-800/80 dark:text-amber-300/80 font-sans">
+                          Fixed ₱5,000/month allowance only · No Overtime (OT) · Can log in to Portal & Time In/Out
+                        </p>
+                      </div>
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-black bg-amber-500 text-slate-950 uppercase self-start sm:self-auto">
+                      {trainingMonths === 2 ? "2 Months · 8 Weeks (56 Days)" : "1 Month · 4 Weeks (28 Days)"}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTrainingMonths(1);
+                        setTrainingEndDate(computeTrainingEndDate(trainingStartDate || dateHired || getBusinessDate(), 1));
+                      }}
+                      className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                        trainingMonths === 1
+                          ? "bg-white dark:bg-zinc-900 border-amber-500 shadow-xs ring-1 ring-amber-500/40"
+                          : "bg-white/50 dark:bg-zinc-950/50 border-amber-200 dark:border-amber-900/40 opacity-75 hover:opacity-100"
+                      }`}
+                    >
+                      <div className="text-xs font-bold text-zinc-900 dark:text-white flex items-center justify-between">
+                        <span>1 Month Training Only</span>
+                        <span className="text-[10px] font-mono text-amber-600 dark:text-amber-400">4 Weeks</span>
+                      </div>
+                      <p className="text-[10px] text-zinc-500 mt-0.5">28 total calendar days before becoming a regular employee</p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTrainingMonths(2);
+                        setTrainingEndDate(computeTrainingEndDate(trainingStartDate || dateHired || getBusinessDate(), 2));
+                      }}
+                      className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                        trainingMonths === 2
+                          ? "bg-white dark:bg-zinc-900 border-orange-500 shadow-xs ring-1 ring-orange-500/40"
+                          : "bg-white/50 dark:bg-zinc-950/50 border-amber-200 dark:border-amber-900/40 opacity-75 hover:opacity-100"
+                      }`}
+                    >
+                      <div className="text-xs font-bold text-zinc-900 dark:text-white flex items-center justify-between">
+                        <span>Extend to 2 Months</span>
+                        <span className="text-[10px] font-mono text-orange-600 dark:text-orange-400">8 Weeks</span>
+                      </div>
+                      <p className="text-[10px] text-zinc-500 mt-0.5">56 total days if trainee needs more time to learn first</p>
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-amber-900 dark:text-amber-300 font-mono">
+                        TRAINING START DATE
+                      </label>
+                      <input
+                        type="date"
+                        value={trainingStartDate}
+                        onChange={(e) => {
+                          const s = e.target.value;
+                          setTrainingStartDate(s);
+                          setTrainingEndDate(computeTrainingEndDate(s, trainingMonths));
+                        }}
+                        className="w-full text-xs px-3 py-1.5 bg-white dark:bg-zinc-950 border border-amber-200 dark:border-amber-800 rounded-lg font-mono font-bold text-zinc-900 dark:text-white"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-amber-900 dark:text-amber-300 font-mono">
+                        TRAINING END DATE ({trainingMonths * 4} WEEKS / {trainingMonths * 28} DAYS)
+                      </label>
+                      <input
+                        type="date"
+                        readOnly
+                        value={trainingEndDate}
+                        className="w-full text-xs px-3 py-1.5 bg-amber-100/60 dark:bg-zinc-900 border border-amber-200 dark:border-amber-800 rounded-lg font-mono font-bold text-amber-900 dark:text-amber-300 cursor-not-allowed"
+                      />
+                    </div>
+                  </div>
+
+                  {trainingMonths === 2 && (
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-orange-800 dark:text-orange-300 font-mono">
+                        EXTENSION REASON / NOTES (OPTIONAL)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Needs extra 4 weeks to master workflow before regularization"
+                        value={trainingExtensionReason}
+                        onChange={(e) => setTrainingExtensionReason(e.target.value)}
+                        className="w-full text-xs px-3 py-1.5 bg-white dark:bg-zinc-950 border border-orange-200 dark:border-orange-800 rounded-lg text-zinc-900 dark:text-white placeholder:text-zinc-400"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Financial inputs section */}
               <div className="bg-zinc-50 dark:bg-zinc-900/40 p-4 rounded-xl border border-zinc-150 dark:border-zinc-900 space-y-4">
-                <h4 className="text-[11px] font-bold text-zinc-650 dark:text-zinc-400 font-mono flex items-center gap-1">
-                  <CreditCard className="w-3.5 h-3.5 text-blue-500" /> COMPENSATION SCALA & RATES
-                </h4>
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <h4 className="text-[11px] font-bold text-zinc-650 dark:text-zinc-400 font-mono flex items-center gap-1">
+                    <CreditCard className="w-3.5 h-3.5 text-blue-500" /> COMPENSATION SCALA & RATES
+                  </h4>
+                  {employmentType === "Training" && (
+                    <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+                      Training Mode: Fixed ₱5,000/mo Allowance Only · No OT
+                    </span>
+                  )}
+                </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="space-y-1">
@@ -1511,7 +1919,8 @@ export default function EmployeeManager({ employees, onRefresh, isSuperAdmin, se
                     <input
                       type="number"
                       required
-                      value={salary}
+                      disabled={employmentType === "Training"}
+                      value={employmentType === "Training" ? 0 : salary}
                       onChange={(e) => {
                         const val = parseFloat(e.target.value) || 0;
                         setSalary(val);
@@ -1519,12 +1928,25 @@ export default function EmployeeManager({ employees, onRefresh, isSuperAdmin, se
                         const autoOt = parseFloat(((val / 20) / 8).toFixed(2));
                         setOtRate(autoOt);
                       }}
-                      className="w-full text-xs px-3 py-1.5 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-808 rounded-lg focus:outline-none font-semibold dark:text-zinc-100 font-mono text-right"
+                      className="w-full text-xs px-3 py-1.5 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-808 rounded-lg focus:outline-none font-semibold dark:text-zinc-100 font-mono text-right disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-zinc-500 font-mono tracking-wider">ALLOWANCE PAY (₱)</label>
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-bold text-zinc-500 font-mono tracking-wider">
+                        {employmentType === "Training" ? "TRAINING ALLOWANCE / MO (₱)" : "ALLOWANCE PAY (₱)"}
+                      </label>
+                      {employmentType === "Training" && allowance !== 5000 && (
+                        <button
+                          type="button"
+                          onClick={() => setAllowance(5000)}
+                          className="text-[9px] font-mono font-bold text-amber-600 hover:underline cursor-pointer"
+                        >
+                          Reset ₱5,000
+                        </button>
+                      )}
+                    </div>
                     <input
                       type="number"
                       value={allowance}
@@ -1537,16 +1959,23 @@ export default function EmployeeManager({ employees, onRefresh, isSuperAdmin, se
                     <label className="text-[10px] font-bold text-zinc-500 font-mono tracking-wider">Hourly OT rate (₱)</label>
                     <input
                       type="number"
-                      value={otRate}
+                      disabled={employmentType === "Training"}
+                      value={employmentType === "Training" ? 0 : otRate}
                       onChange={(e) => setOtRate(parseFloat(e.target.value) || 0)}
-                      className="w-full text-xs px-3 py-1.5 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-808 rounded-lg focus:outline-none font-semibold dark:text-zinc-100 font-mono text-right"
+                      className="w-full text-xs px-3 py-1.5 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-808 rounded-lg focus:outline-none font-semibold dark:text-zinc-100 font-mono text-right disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                   </div>
                 </div>
 
                 <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-zinc-200/50 dark:border-zinc-800">
-                  <span className="text-zinc-500 font-mono font-medium">Calculated Daily Rate:</span>
-                  <span className="font-bold text-blue-600 font-mono text-xs">₱{(calculatedDailyRate || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                  <span className="text-zinc-500 font-mono font-medium">
+                    {employmentType === "Training" ? "Training Payroll Summary:" : "Calculated Daily Rate:"}
+                  </span>
+                  <span className="font-bold text-blue-600 font-mono text-xs">
+                    {employmentType === "Training"
+                      ? `₱${((allowance || 5000) / 2).toLocaleString(undefined, { minimumFractionDigits: 2 })} / cutoff (Fixed ₱${(allowance || 5000).toLocaleString()}/mo · No OT)`
+                      : `₱${(calculatedDailyRate || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
+                  </span>
                 </div>
 
                 {/* Designated Cutoff Salary Transitions & Rate History */}
@@ -2747,6 +3176,216 @@ export default function EmployeeManager({ employees, onRefresh, isSuperAdmin, se
                   className="px-5 py-2 text-xs font-bold bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-xl shadow-md cursor-pointer transition-all"
                 >
                   {isSubmittingQuick ? "Creating..." : "Create Profile Instantly"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* EXTEND TRAINING TO 2 MONTHS (8 WEEKS) MODAL */}
+      {extendModalEmployee && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4 z-55 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-zinc-950 border border-orange-200 dark:border-orange-900/60 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="p-5 border-b border-zinc-200 dark:border-zinc-800 bg-orange-50/70 dark:bg-orange-950/20 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-orange-500/15 text-orange-600 dark:text-orange-400 flex items-center justify-center">
+                  <Clock className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-sm text-zinc-900 dark:text-white">
+                    Extend Training to 2 Months (8 Weeks)
+                  </h3>
+                  <p className="text-[11px] text-zinc-500 font-mono">
+                    {extendModalEmployee.fullName} (#{extendModalEmployee.employeeNumber})
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setExtendModalEmployee(null)}
+                className="p-1 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 rounded-lg cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmExtendTraining} className="p-5 space-y-4">
+              {(() => {
+                const startStr = extendModalEmployee.trainingStartDate || extendModalEmployee.dateHired || getBusinessDate();
+                const currentEnd = computeTrainingEndDate(startStr, 1);
+                const extendedEnd = computeTrainingEndDate(startStr, 2);
+                return (
+                  <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs font-mono space-y-1.5">
+                    <div className="flex justify-between">
+                      <span className="text-zinc-500">Current (1 Mo / 4 Wks):</span>
+                      <span className="font-bold text-zinc-800 dark:text-zinc-200">{startStr} → {currentEnd}</span>
+                    </div>
+                    <div className="flex justify-between text-orange-600 dark:text-orange-400">
+                      <span>Extended (2 Mos / 8 Wks):</span>
+                      <span className="font-extrabold">{startStr} → {extendedEnd}</span>
+                    </div>
+                    <div className="flex justify-between text-zinc-500 pt-1 border-t border-zinc-200 dark:border-zinc-800">
+                      <span>Compensation Policy:</span>
+                      <span className="font-bold text-amber-600 dark:text-amber-400">Fixed ₱5,000/mo Allowance · No OT</span>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-zinc-500 font-mono uppercase">
+                  Extension Reason / Learning Notes
+                </label>
+                <input
+                  type="text"
+                  value={extendReasonInput}
+                  onChange={(e) => setExtendReasonInput(e.target.value)}
+                  className="w-full text-xs px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none dark:text-white"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-900">
+                <button
+                  type="button"
+                  onClick={() => setExtendModalEmployee(null)}
+                  className="px-4 py-2 text-xs font-bold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingTrainingAction}
+                  className="px-4 py-2 text-xs font-bold bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white rounded-xl shadow-sm cursor-pointer"
+                >
+                  {savingTrainingAction ? "Extending..." : "Confirm 2-Month Extension (8 Weeks)"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* GRADUATE TRAINEE TO NEW REGULAR EMPLOYEE MODAL */}
+      {graduateModalEmployee && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4 z-55 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-zinc-950 border border-emerald-200 dark:border-emerald-900/60 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="p-5 border-b border-zinc-200 dark:border-zinc-800 bg-emerald-50/70 dark:bg-emerald-950/20 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                  <GraduationCap className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-sm text-zinc-900 dark:text-white">
+                    Graduate Trainee to New Employee
+                  </h3>
+                  <p className="text-[11px] text-zinc-500 font-mono">
+                    {graduateModalEmployee.fullName} (#{graduateModalEmployee.employeeNumber})
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setGraduateModalEmployee(null)}
+                className="p-1 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 rounded-lg cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmGraduateTrainee} className="p-5 space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-zinc-500 font-mono uppercase">New Employment Type</label>
+                  <select
+                    value={gradEmploymentType}
+                    onChange={(e) => setGradEmploymentType(e.target.value as any)}
+                    className="w-full text-xs px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl font-mono font-bold dark:text-white"
+                  >
+                    <option value="Full-time">Full-time</option>
+                    <option value="Part-time">Part-time</option>
+                    <option value="Contract">Contract</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-zinc-500 font-mono uppercase">Effective Date</label>
+                  <input
+                    type="date"
+                    required
+                    value={gradEffectiveDate}
+                    onChange={(e) => setGradEffectiveDate(e.target.value)}
+                    className="w-full text-xs px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl font-mono font-bold dark:text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2.5">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-zinc-500 font-mono uppercase">Basic / Mo (₱)</label>
+                  <input
+                    type="number"
+                    required
+                    min="1"
+                    value={gradSalary}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value) || 0;
+                      setGradSalary(val);
+                      setGradOtRate(parseFloat(((val / 20) / 8).toFixed(2)));
+                    }}
+                    className="w-full text-xs px-2.5 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl font-mono font-bold text-right dark:text-white"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-zinc-500 font-mono uppercase">Allowance (₱)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={gradAllowance}
+                    onChange={(e) => setGradAllowance(parseFloat(e.target.value) || 0)}
+                    className="w-full text-xs px-2.5 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl font-mono font-bold text-right dark:text-white"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-zinc-500 font-mono uppercase">OT Rate / Hr (₱)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={gradOtRate}
+                    onChange={(e) => setGradOtRate(parseFloat(e.target.value) || 0)}
+                    className="w-full text-xs px-2.5 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl font-mono font-bold text-right dark:text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-zinc-500 font-mono uppercase">Transition Notes</label>
+                <input
+                  type="text"
+                  value={gradNotes}
+                  onChange={(e) => setGradNotes(e.target.value)}
+                  className="w-full text-xs px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl dark:text-white"
+                />
+              </div>
+
+              <div className="p-3 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/50 text-[11px] text-emerald-800 dark:text-emerald-300 leading-relaxed">
+                Past training cutoffs stay locked at Fixed ₱{(graduateModalEmployee.allowance || 5000).toLocaleString()}/mo Allowance & No OT via Rate History. New salary starts on <strong>{gradEffectiveDate}</strong>.
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-900">
+                <button
+                  type="button"
+                  onClick={() => setGraduateModalEmployee(null)}
+                  className="px-4 py-2 text-xs font-bold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingTrainingAction}
+                  className="px-4 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl shadow-sm cursor-pointer"
+                >
+                  {savingTrainingAction ? "Promoting..." : "Promote to New Employee"}
                 </button>
               </div>
             </form>

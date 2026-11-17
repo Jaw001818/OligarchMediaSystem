@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { db, handleFirestoreError, OperationType, collection, addDoc, doc, updateDoc, setDoc, deleteDoc, getDocs, query, where } from "../firebase";
 import { Employee, Attendance, Payroll, PayrollPeriod, LeaveRequest, CashAdvance, BossDebt, AppSettings, NoWorkDay } from "../types";
-import { sendNotificationEmail, sendBulkPayrollEmails, calculateLateMinutes, getBirthdayWeekInfo, getEmployeeRateForDate, calculateSalaryIncrease, getBusinessDate, calculateNightDifferentialHours, getScheduleTimesForLog, getEmployeeSchedule } from "../utils";
+import { sendNotificationEmail, sendBulkPayrollEmails, calculateLateMinutes, getBirthdayWeekInfo, getEmployeeRateForDate, calculateSalaryIncrease, getBusinessDate, calculateNightDifferentialHours, getScheduleTimesForLog, getEmployeeSchedule, isEmployeeInTraining, getTrainingProgress } from "../utils";
 import BossCutoffAttendanceSummary from "./BossCutoffAttendanceSummary";
 import { subscribeToGoogleAuth, getAccessToken } from "../services/googleAuth";
 import { jsPDF } from "jspdf";
@@ -851,26 +851,37 @@ export default function PayrollManager({
         
         // Resolve employee's rate for this designated cutoff cycle (honors salary transitions)
         const empRate = getEmployeeRateForDate(emp, period.startDate);
-        const activeDailyRate = empRate.dailyRate || emp.dailyRate || ((empRate.salary || emp.salary) ? (empRate.salary || emp.salary) / 22 : 0);
+        const isTrainingCutoff =
+          isEmployeeInTraining(emp) ||
+          (empRate.salary === 0 && (empRate.reason?.toLowerCase().includes("training") ?? false));
+
+        const activeDailyRate = isTrainingCutoff
+          ? 0
+          : (empRate.isHistorical
+              ? (empRate.dailyRate ?? 0)
+              : (empRate.dailyRate || emp.dailyRate || ((empRate.salary || emp.salary) ? (empRate.salary || emp.salary) / 22 : 0)));
         const activeHourlyRate = activeDailyRate / 8;
 
-        // Overtime rate: If enableOT125 is true on this cutoff, compute at 125% (1.25x). Otherwise fallback to legacy empRate.otRate
-        const activeOtRate = (period.enableOT125 ?? false)
-          ? parseFloat((activeHourlyRate * (period.otRateMultiplier ?? 1.25)).toFixed(2))
-          : (empRate.otRate || emp.otRate);
+        // Overtime rate: Strictly 0 for Training employees (No OT)
+        const activeOtRate = isTrainingCutoff
+          ? 0
+          : ((period.enableOT125 ?? false)
+              ? parseFloat((activeHourlyRate * (period.otRateMultiplier ?? 1.25)).toFixed(2))
+              : (empRate.otRate || emp.otRate));
 
-        // Paid leaves are compensated at full dailyRate
-        const paidLeavePay = paidLeavesCount * activeDailyRate;
-        const bdayLeavePay = bdayLeavesCount * activeDailyRate;
+        // Paid leaves are compensated at full dailyRate (0 for trainees)
+        const paidLeavePay = isTrainingCutoff ? 0 : paidLeavesCount * activeDailyRate;
+        const bdayLeavePay = isTrainingCutoff ? 0 : bdayLeavesCount * activeDailyRate;
         
         const totalWorkedHours = empLogs.reduce((sum, a) => sum + (a.hoursWorked || 0), 0);
-        const basicSalaryProrated = totalWorkedHours * activeHourlyRate;
-        const otPay = totalOTHours * activeOtRate;
+        const basicSalaryProrated = isTrainingCutoff ? 0 : totalWorkedHours * activeHourlyRate;
+        const effectiveOTHours = isTrainingCutoff ? 0 : totalOTHours;
+        const otPay = isTrainingCutoff ? 0 : effectiveOTHours * activeOtRate;
 
-        // Philippine Night Shift Differential (Art. 86: 10% premium for 10 PM - 6 AM)
+        // Philippine Night Shift Differential (Art. 86: 10% premium for 10 PM - 6 AM) - 0 for trainees
         let totalNightDiffHours = 0;
         let nightDiffPay = 0;
-        if (period.enableNightDiff) {
+        if (period.enableNightDiff && !isTrainingCutoff) {
           totalNightDiffHours = empLogs.reduce((sum, a) => {
             const schedTimes = getScheduleTimesForLog(a, emp, settings);
             const ndh = calculateNightDifferentialHours(
@@ -900,14 +911,17 @@ export default function PayrollManager({
         const minuteRate = activeDailyRate / 8 / 60;
         const lateDeduction = 0;
 
-        // Standard allowance calculation: standard fixed cutoff allowance (or 0 if Removed)
+        // Standard allowance calculation: fixed monthly allowance / 2 per cutoff (Trainees = ₱5,000/mo -> ₱2,500/cutoff)
+        const resolvedMonthlyAllowance = isTrainingCutoff
+          ? ((empRate.allowance ?? emp.allowance) > 0 ? (empRate.allowance ?? emp.allowance) : 5000)
+          : (empRate.allowance ?? emp.allowance ?? 0);
         let allowanceCutoff = 0;
         if (customAllowanceOverrides[emp.id || ""] !== undefined) {
           allowanceCutoff = customAllowanceOverrides[emp.id || ""];
         } else if (allowancePolicy === "Removed") {
           allowanceCutoff = 0;
         } else {
-          allowanceCutoff = (empRate.allowance ?? emp.allowance) / 2;
+          allowanceCutoff = resolvedMonthlyAllowance / 2;
         }
 
         // E. Cash Advances (Deductions -) - Exclude deferred to next cutoff
@@ -958,6 +972,7 @@ export default function PayrollManager({
           additionalCashPay: parseFloat((additionalCashPay || 0).toFixed(2)),
           additionalCashNotes: debtsPaidInThisCutoff.map(d => d.label).join("; "),
           otPay: parseFloat((otPay || 0).toFixed(2)),
+          otHours: effectiveOTHours,
           nightDiffHours: parseFloat((totalNightDiffHours || 0).toFixed(2)),
           nightDiffPay: parseFloat((nightDiffPay || 0).toFixed(2)),
           extraDaysPay: parseFloat((extraDaysPay || 0).toFixed(2)),
@@ -968,6 +983,7 @@ export default function PayrollManager({
           lateDeduction: parseFloat((lateDeduction || 0).toFixed(2)),
           cashAdvanceDeduction: parseFloat((cashAdvanceDeduction || 0).toFixed(2)),
           finalSalary: parseFloat((finalSalary || 0).toFixed(2)),
+          isTrainingPayroll: isTrainingCutoff,
           status: "Draft",
           generatedAt: new Date().toISOString()
         };
@@ -2073,25 +2089,36 @@ Official electronic payroll notification. Printable payslip statement is accessi
 
       // Resolve employee's rate for this designated cutoff cycle (honors salary transitions)
       const empRate = getEmployeeRateForDate(emp, selectedPeriodObj ? selectedPeriodObj.startDate : getBusinessDate());
-      const activeDailyRate = empRate.dailyRate || emp.dailyRate || ((empRate.salary || emp.salary) ? (empRate.salary || emp.salary) / 22 : 0);
+      const isTrainingCutoff =
+        isEmployeeInTraining(emp) ||
+        (empRate.salary === 0 && (empRate.reason?.toLowerCase().includes("training") ?? false));
+
+      const activeDailyRate = isTrainingCutoff
+        ? 0
+        : (empRate.isHistorical
+            ? (empRate.dailyRate ?? 0)
+            : (empRate.dailyRate || emp.dailyRate || ((empRate.salary || emp.salary) ? (empRate.salary || emp.salary) / 22 : 0)));
       const activeHourlyRate = activeDailyRate / 8;
 
-      // Overtime rate: If enableOT125 is true on this cutoff, compute at 125% (1.25x). Otherwise fallback to legacy empRate.otRate
-      const activeOtRate = (selectedPeriodObj?.enableOT125 ?? false)
-        ? parseFloat((activeHourlyRate * (selectedPeriodObj?.otRateMultiplier ?? 1.25)).toFixed(2))
-        : (empRate.otRate || emp.otRate);
+      // Overtime rate: Strictly 0 for Training employees (No OT)
+      const activeOtRate = isTrainingCutoff
+        ? 0
+        : ((selectedPeriodObj?.enableOT125 ?? false)
+            ? parseFloat((activeHourlyRate * (selectedPeriodObj?.otRateMultiplier ?? 1.25)).toFixed(2))
+            : (empRate.otRate || emp.otRate));
 
-      const paidLeavePay = paidLeavesCount * activeDailyRate;
-      const bdayLeavePay = bdayLeavesCount * activeDailyRate;
+      const paidLeavePay = isTrainingCutoff ? 0 : paidLeavesCount * activeDailyRate;
+      const bdayLeavePay = isTrainingCutoff ? 0 : bdayLeavesCount * activeDailyRate;
       
       const totalWorkedHours = empLogs.reduce((sum, a) => sum + (a.hoursWorked || 0), 0);
-      const basicSalaryProrated = totalWorkedHours * activeHourlyRate;
-      const otPay = totalOTHours * activeOtRate;
+      const basicSalaryProrated = isTrainingCutoff ? 0 : totalWorkedHours * activeHourlyRate;
+      const effectiveOTHours = isTrainingCutoff ? 0 : totalOTHours;
+      const otPay = isTrainingCutoff ? 0 : effectiveOTHours * activeOtRate;
 
-      // Philippine Night Shift Differential (Art. 86: 10% premium for 10 PM - 6 AM)
+      // Philippine Night Shift Differential (Art. 86: 10% premium for 10 PM - 6 AM) - 0 for trainees
       let totalNightDiffHours = 0;
       let nightDiffPay = 0;
-      if (selectedPeriodObj?.enableNightDiff) {
+      if (selectedPeriodObj?.enableNightDiff && !isTrainingCutoff) {
         totalNightDiffHours = empLogs.reduce((sum, a) => {
           const schedTimes = getScheduleTimesForLog(a, emp, settings);
           const ndh = calculateNightDifferentialHours(
@@ -2120,14 +2147,17 @@ Official electronic payroll notification. Printable payslip statement is accessi
       const minuteRate = activeDailyRate / 8 / 60;
       const lateDeduction = 0;
 
-      // Standard allowance calculation: standard fixed cutoff allowance (or 0 if Removed)
+      // Standard allowance calculation: fixed monthly allowance / 2 per cutoff (Trainees = ₱5,000/mo -> ₱2,500/cutoff)
+      const resolvedMonthlyAllowance = isTrainingCutoff
+        ? ((empRate.allowance ?? emp.allowance) > 0 ? (empRate.allowance ?? emp.allowance) : 5000)
+        : (empRate.allowance ?? emp.allowance ?? 0);
       let allowanceCutoff = 0;
       if (customAllowanceOverrides[emp.id || ""] !== undefined) {
         allowanceCutoff = customAllowanceOverrides[emp.id || ""];
       } else if (allowancePolicy === "Removed") {
         allowanceCutoff = 0;
       } else {
-        allowanceCutoff = (empRate.allowance ?? emp.allowance) / 2;
+        allowanceCutoff = resolvedMonthlyAllowance / 2;
       }
 
       // Cash Advances (Deductions -) - Exclude deferred to next cutoff
@@ -2207,7 +2237,7 @@ Official electronic payroll notification. Printable payslip statement is accessi
         presentDays: presentLogs.length,
         actualAbsences: actualAbsencesToDeduct,
         workedHours: empLogs.reduce((sum, a) => sum + (a.hoursWorked || 0), 0),
-        otHours: totalOTHours,
+        otHours: effectiveOTHours,
         breakHours: empLogs.reduce((sum, a) => {
           let bHours = (a.accumulatedBreakSeconds || 0) / 3600;
           if (bHours === 0 && a.breakStart && a.breakEnd) {
@@ -2221,6 +2251,7 @@ Official electronic payroll notification. Printable payslip statement is accessi
           return sum + (bHours > 0 ? bHours : 0);
         }, 0),
         finalSalary: parseFloat((finalSalary || 0).toFixed(2)),
+        isTrainingPayroll: isTrainingCutoff,
         status: existing?.status || "Draft",
         generatedAt: existing?.generatedAt || new Date().toISOString()
       };
@@ -2390,13 +2421,14 @@ Official electronic payroll notification. Printable payslip statement is accessi
       const totalEffectiveHours = totalHoursWorked + leaveHoursCompensated;
       const hoursDiscrepancy = expectedHours - totalEffectiveHours;
 
-      const hasShortfall = hoursDiscrepancy > 0.1;
-      const hasOvertime = (pr?.otPay || 0) > 0 || empLogs.some(a => (a.otHours || 0) > 0);
+      const isTraineeAudit = isEmployeeInTraining(emp) || Boolean(pr?.isTrainingPayroll);
+      const hasShortfall = isTraineeAudit ? false : hoursDiscrepancy > 0.1;
+      const hasOvertime = isTraineeAudit ? false : ((pr?.otPay || 0) > 0 || empLogs.some(a => (a.otHours || 0) > 0));
       const hasLateness = totalLateMinutes > 0;
       const hasAbsences = absentLogsCount > 0;
 
-      const expectedBasicCutoff = emp.salary / 2;
-      const expectedAllowanceCutoff = emp.allowance / 2;
+      const expectedBasicCutoff = isTraineeAudit ? 0 : emp.salary / 2;
+      const expectedAllowanceCutoff = isTraineeAudit ? ((emp.allowance || 5000) / 2) : (emp.allowance / 2);
       const standardBaseGross = expectedBasicCutoff + expectedAllowanceCutoff;
       const finalNet = pr?.finalSalary ?? 0;
       const hasNumericMismatch = pr ? Math.abs(finalNet - standardBaseGross) > 0.01 : false;
@@ -2577,14 +2609,21 @@ Official electronic payroll notification. Printable payslip statement is accessi
 
         const monthSampleDate = `${selected13thYear}-${monthStr}-01`;
         const empRate = getEmployeeRateForDate(emp, monthSampleDate);
+        const isTrainingMonth =
+          isEmployeeInTraining(emp) ||
+          (empRate.salary === 0 && (empRate.reason?.toLowerCase().includes("training") ?? false));
 
-        const monthlyBasic = empRate.salary || emp.salary || (emp.dailyRate * 22);
-        const dailyRate = empRate.dailyRate || emp.dailyRate || (monthlyBasic / 22);
+        const monthlyBasic = isTrainingMonth
+          ? 0
+          : (empRate.isHistorical ? (empRate.salary ?? 0) : (empRate.salary || emp.salary || (emp.dailyRate * 22)));
+        const dailyRate = isTrainingMonth
+          ? 0
+          : (empRate.isHistorical ? (empRate.dailyRate ?? 0) : (empRate.dailyRate || emp.dailyRate || (monthlyBasic / 22)));
         const absentDeduction = absentDays * dailyRate;
         const unpaidNoWorkDeduction = unpaidNoWorkDays * dailyRate;
 
         let netBasicEarned = 0;
-        if (monthIdx < startMonthIdx) {
+        if (isTrainingMonth || monthIdx < startMonthIdx) {
           netBasicEarned = 0;
         } else if (calculationScope === "app_inception_only" && isMonthBeforeInception) {
           netBasicEarned = 0;
@@ -2624,8 +2663,12 @@ Official electronic payroll notification. Printable payslip statement is accessi
       const yearTransitions = (emp.salaryHistory || []).filter(r => r.effectiveDate.startsWith(`${selected13thYear}-`));
       const hasYearSalaryTransition = yearTransitions.length > 0;
       const latestYearRate = getEmployeeRateForDate(emp, `${selected13thYear}-12-31`);
-      const monthlyBasic = latestYearRate.salary || emp.salary || (emp.dailyRate * 22);
-      const dailyRate = latestYearRate.dailyRate || emp.dailyRate || (monthlyBasic / 22);
+      const monthlyBasic = isEmployeeInTraining(emp)
+        ? 0
+        : (latestYearRate.isHistorical ? (latestYearRate.salary ?? 0) : (latestYearRate.salary || emp.salary || (emp.dailyRate * 22)));
+      const dailyRate = isEmployeeInTraining(emp)
+        ? 0
+        : (latestYearRate.isHistorical ? (latestYearRate.dailyRate ?? 0) : (latestYearRate.dailyRate || emp.dailyRate || (monthlyBasic / 22)));
       const thirteenthMonthPay = totalYearBasicEarned / 12;
 
       return {
@@ -4083,11 +4126,21 @@ Official electronic payroll notification. Printable payslip statement is accessi
               <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800 font-medium">
                 {currentPayrollList.map((pr) => {
                   const emp = employees.find(e => e.id === pr.employeeId || e.employeeNumber === pr.employeeNumber || (pr.fullName && e.fullName?.toLowerCase() === pr.fullName.toLowerCase()));
+                  const isTraineeRow = Boolean(pr.isTrainingPayroll) || isEmployeeInTraining(emp);
+                  const traineeProg = emp && isEmployeeInTraining(emp) ? getTrainingProgress(emp, getBusinessDate()) : null;
                   return (
                   <tr key={pr.payrollId} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-900/20 transition-colors">
                     <td className="py-3 px-4 font-bold text-zinc-850 dark:text-zinc-50">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <span>{pr.fullName}</span>
+                        {isTraineeRow && (
+                          <span
+                            className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 font-bold uppercase tracking-wider font-mono"
+                            title="Trainee: Fixed ₱5,000/month Allowance Only · No OT"
+                          >
+                            Trainee {traineeProg ? `(${traineeProg.totalWeeks} Wks)` : ""} · No OT
+                          </span>
+                        )}
                         {emp?.status === "Resigned" && (
                           <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30 font-semibold uppercase tracking-wider" title="Employee is marked as Resigned, but has earned pay in this cutoff">
                             Resigned
@@ -4104,11 +4157,17 @@ Official electronic payroll notification. Printable payslip statement is accessi
                       {currency}{(pr.basicSalary || 0).toLocaleString()}
                     </td>
                     <td className="py-3 px-4 text-right font-mono text-green-600">
-                      <div>+{currency}{((pr.otPay || 0) + (pr.extraDaysPay || 0)).toLocaleString()}</div>
-                      {(pr.otHours || 0) > 0 && (
-                        <span className="text-[10px] text-zinc-400 font-normal">
-                          {pr.otHours}h {selectedPeriodObj?.enableOT125 ? "@ 125%" : ""}
-                        </span>
+                      {isTraineeRow ? (
+                        <span className="text-[10px] font-mono text-zinc-400">No OT (₱0)</span>
+                      ) : (
+                        <>
+                          <div>+{currency}{((pr.otPay || 0) + (pr.extraDaysPay || 0)).toLocaleString()}</div>
+                          {(pr.otHours || 0) > 0 && (
+                            <span className="text-[10px] text-zinc-400 font-normal">
+                              {pr.otHours}h {selectedPeriodObj?.enableOT125 ? "@ 125%" : ""}
+                            </span>
+                          )}
+                        </>
                       )}
                     </td>
                     {selectedPeriodObj?.enableNightDiff && (

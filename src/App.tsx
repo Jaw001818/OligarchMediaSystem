@@ -79,8 +79,7 @@ import {
   Sun,
   Moon,
   Sparkles,
-  X,
-  MessageSquare
+  X
 } from "lucide-react";
 
 export default function App() {
@@ -572,6 +571,7 @@ export default function App() {
       console.error(err);
     } finally {
       setCurrentUser(null);
+      setPortalMode(true);
       setCurrentTab("dashboard");
     }
   };
@@ -601,154 +601,34 @@ export default function App() {
       <div className="fixed -top-24 -right-24 w-[500px] h-[500px] rounded-full bg-gradient-to-br from-indigo-500/15 via-purple-500/10 to-transparent blur-3xl pointer-events-none -z-10" />
       <div className="fixed -bottom-24 -left-24 w-[450px] h-[450px] rounded-full bg-gradient-to-tr from-sky-500/10 via-emerald-500/5 to-transparent blur-3xl pointer-events-none -z-10" />
 
-      {/* CORE FRAME: IF PUBLIC PORTAL VIEW MODE IS ACTIVATED */}
-      {portalMode ? (
+      {/* UNIFIED GATEWAY: ALL USERS (EMPLOYEES & ADMIN) USE THE INTEGRATED LOGIN */}
+      {!currentUser || portalMode ? (
         <main className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col justify-between">
           <div className="flex-1">
-            <Portal onLoginStateChange={setIsEmployeePortalLoggedIn} />
+            <Portal 
+              onLoginStateChange={setIsEmployeePortalLoggedIn} 
+              onAdminLogin={(sessionUser) => {
+                setCurrentUser(sessionUser);
+                setPortalMode(false);
+              }}
+            />
           </div>
-          {!isEmployeePortalLoggedIn && (
-            <div className="py-6 bg-slate-50/80 dark:bg-[#07090E]/80 backdrop-blur-md border-t border-slate-200/60 dark:border-white/5 text-center flex flex-col items-center justify-center gap-1.5 mt-auto">
-              <p className="text-[10px] text-slate-400 dark:text-slate-500 font-mono flex items-center justify-center gap-1.5">
-                <span>Oligarch Media Studio Gateway</span>
-                {/* Discrete inconspicuous admin trigger: subtle dot symbol that only admins know to tap */}
-                <button
-                  type="button"
-                  onClick={() => setPortalMode(false)}
-                  className="text-slate-400 dark:text-slate-600 hover:text-slate-600 dark:hover:text-slate-300 transition-colors p-0.5 rounded cursor-pointer select-none"
-                  title="Studio Gateway"
-                  aria-label="Studio Gateway"
-                >
-                  •
-                </button>
-                <span>All activity monitored</span>
-              </p>
-              {currentUser && (
-                /* Small discrete return pill when an admin is logged in */
-                <button
-                  type="button"
-                  onClick={() => setPortalMode(false)}
-                  className="mt-1 inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-mono font-bold text-slate-400 hover:text-slate-200 bg-slate-200/60 dark:bg-white/5 hover:bg-slate-300 dark:hover:bg-white/10 border border-slate-300/60 dark:border-white/10 transition-all opacity-40 hover:opacity-100 cursor-pointer shadow-xs"
-                >
-                  <Lock className="w-2.5 h-2.5 text-indigo-400" />
-                  <span>Admin Console</span>
-                </button>
-              )}
+          {currentUser && (
+            <div className="py-3 bg-slate-50/80 dark:bg-[#07090E]/80 backdrop-blur-md border-t border-slate-200/60 dark:border-white/5 text-center flex items-center justify-center gap-2 mt-auto">
+              <button
+                type="button"
+                onClick={() => setPortalMode(false)}
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-mono font-bold text-indigo-400 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 transition-all cursor-pointer shadow-xs"
+              >
+                <Lock className="w-3 h-3" />
+                <span>Return to Admin Console</span>
+              </button>
             </div>
           )}
         </main>
       ) : (
-        /* OTHERWISE: LOAD STANDARD ADMIN/LOGIN INTERACTIVE ACTIONS */
-        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-          {!currentUser ? (
-            /* PHASE A: AUTHENTICATION FLOATING BUBBLE LOGIN */
-            <div className="flex-1 flex items-center justify-center p-4 overflow-y-auto">
-              <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border border-slate-200/90 dark:border-white/10 ring-1 ring-slate-900/5 dark:ring-white/5 w-full max-w-sm rounded-[2.5rem] overflow-hidden shadow-2xl shadow-indigo-500/10 p-7 sm:p-8 relative animate-in fade-in zoom-in-95 duration-200">
-                {/* Floating ambient glow bubbles */}
-                <div className="absolute -top-12 -right-12 w-36 h-36 bg-gradient-to-br from-indigo-500/20 to-sky-400/15 rounded-full blur-2xl pointer-events-none" />
-                <div className="absolute -bottom-12 -left-12 w-32 h-32 bg-gradient-to-tr from-purple-500/15 to-transparent rounded-full blur-2xl pointer-events-none" />
-
-                <div className="text-center mb-6 relative">
-                  <div className="w-14 h-14 rounded-3xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-sky-400 flex items-center justify-center text-white font-black text-xl mx-auto mb-3 shadow-lg shadow-indigo-500/25 ring-4 ring-indigo-500/20">
-                    OM
-                  </div>
-                  <h3 className="text-lg font-black text-slate-900 dark:text-white tracking-tight">Oligarch Media Control Panel</h3>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 max-w-[240px] mx-auto font-mono">HR Calculations, Attendance & Studio Operations</p>
-                </div>
-
-                {authError && (
-                  <div className="p-3 bg-red-50 dark:bg-red-950/20 text-red-750 dark:text-red-400 text-xs rounded-2xl flex items-center gap-2 border border-red-100 dark:border-red-900/30 mb-4 font-mono">
-                    <AlertTriangle className="w-4 h-4 shrink-0 text-red-500" />
-                    <span className="break-all">{authError}</span>
-                  </div>
-                )}
-
-                {authMessage && (
-                  <div className="p-3 bg-green-50 dark:bg-green-950/20 text-green-750 dark:text-green-400 text-xs rounded-2xl flex items-center gap-2 border border-green-100 dark:border-green-900/30 mb-4">
-                    <UserCheck className="w-4 h-4 shrink-0 text-green-500" />
-                    <span>{authMessage}</span>
-                  </div>
-                )}
-
-                <form onSubmit={isRegisterMode ? handleRegister : handleLogin} className="space-y-4 relative">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 font-mono uppercase tracking-wider">ADMIN USERNAME / EMAIL</label>
-                    <input
-                      type="email"
-                      required
-                      placeholder="e.g. admin@novacorporate.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="w-full text-xs px-4 py-2.5 bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-white/10 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 text-slate-900 dark:text-white font-mono transition-all"
-                    />
-                  </div>
-
-                  {(() => {
-                    const isSuperAdminEmail = 
-                      email.trim().toLowerCase() === "hr.oligarchmedia@gmail.com" ||
-                      email.trim().toLowerCase() === "oligarchmediaph@gmail.com" || 
-                      (settings?.adminEmail ? email.trim().toLowerCase() === settings.adminEmail.toLowerCase() : false);
-                    
-                    if (isSuperAdminEmail && !isRegisterMode) {
-                      return (
-                        <div className="p-3 bg-sky-500/10 border border-sky-500/20 text-sky-500 dark:text-sky-400 text-[10px] rounded-2xl flex items-center gap-2.5 font-mono animate-in fade-in duration-200">
-                          <ShieldCheck className="w-4 h-4 shrink-0 text-sky-500" />
-                          <span>Identified as Super Admin. Password not required.</span>
-                        </div>
-                      );
-                    }
-
-                    return (
-                      <div className="space-y-1.5 animate-in fade-in duration-200">
-                        <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 font-mono uppercase tracking-wider">PASSWORD OR ADMIN PIN</label>
-                        <input
-                          type="password"
-                          required={!isSuperAdminEmail || isRegisterMode}
-                          placeholder="Enter Password or 4-12 digit PIN"
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          className="w-full text-xs px-4 py-2.5 bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-white/10 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 text-slate-900 dark:text-white font-mono text-center tracking-widest font-bold transition-all"
-                        />
-                      </div>
-                    );
-                  })()}
-
-                  <button
-                    type="submit"
-                    className="w-full bg-gradient-to-r from-indigo-600 via-indigo-500 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold py-3 rounded-2xl text-xs shadow-lg shadow-indigo-600/30 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
-                  >
-                    {isRegisterMode ? "Confirm Setup Admin" : "Sign In Console"}
-                  </button>
-                </form>
-
-                {/* Seeding / signup helper options */}
-                <div className="mt-4 pt-4 border-t border-slate-100 dark:border-white/5 flex justify-between items-center text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                  <button onClick={handleResetPassword} className="hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer">
-                    Forgot Password?
-                  </button>
-
-                  <button 
-                    onClick={() => setIsRegisterMode(!isRegisterMode)} 
-                    className="text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
-                  >
-                    {isRegisterMode ? "Switch to Login" : "Register Admin"}
-                  </button>
-                </div>
-
-                <div className="mt-5 pt-3 border-t border-slate-100 dark:border-white/5 flex justify-center">
-                  <button
-                    onClick={() => setPortalMode(true)}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors text-[10px] font-bold uppercase tracking-wider border border-slate-200 dark:border-white/5 cursor-pointer shadow-xs"
-                  >
-                    <Smartphone className="w-3.5 h-3.5 text-indigo-500" />
-                    <span>Go to Employee Portal</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          ) : (
-            /* PHASE B: IN_CONSOLE NAVIGATION BOARD DESKTOP */
-            <div className="flex-1 flex min-h-0 min-w-0 overflow-hidden">
+        /* PHASE B: IN_CONSOLE NAVIGATION BOARD DESKTOP (AUTHENTICATED ADMIN) */
+        <div className="flex-1 flex min-h-0 min-w-0 overflow-hidden">
               
               {/* Responsive sidebar drawers */}
               <div className="hidden md:block shrink-0">
@@ -819,7 +699,6 @@ export default function App() {
                         { id: "payroll", label: "Payroll Processing Hub", icon: CreditCard },
                         { id: "cash-advances", label: "Cash Advances & Boss Debts", icon: CreditCard },
                         { id: "requests", label: "Employee Leave & Voucher Requests", icon: MailWarning, count: pendingRequestsCount },
-                        { id: "chat", label: "Studio Chat / Messages (Upcoming)", icon: MessageSquare },
                         { id: "trash", label: "Recycle Bin", icon: Trash2 },
                         { id: "settings", label: "Studio System Config", icon: Settings },
                       ].map((item) => {
@@ -984,37 +863,9 @@ export default function App() {
                       noWorkDays={noWorkDays}
                     />
                   )}
-                  {currentTab === "chat" && (
-                    <div className="max-w-2xl mx-auto my-8 p-6 sm:p-10 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-200/90 dark:border-white/10 rounded-3xl shadow-xl text-center space-y-5 animate-in fade-in duration-200">
-                      <div className="w-16 h-16 rounded-3xl bg-indigo-500/10 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mx-auto shadow-inner ring-1 ring-indigo-500/30">
-                        <MessageSquare className="w-8 h-8" />
-                      </div>
-                      <div className="space-y-2">
-                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/20 text-indigo-700 dark:text-indigo-300 text-xs font-mono font-bold uppercase tracking-wider">
-                          <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
-                          <span>Navigation Pre-Wired</span>
-                        </div>
-                        <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-                          Studio Messaging & Team Chat
-                        </h2>
-                        <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto leading-relaxed">
-                          This section is pre-configured and ready. Once you are fully satisfied with the current design improvements, real-time artist messaging, supervisor channels, and team notifications can be activated right here!
-                        </p>
-                      </div>
-                      <div className="pt-2 flex justify-center">
-                        <button
-                          type="button"
-                          onClick={() => setCurrentTab("dashboard")}
-                          className="px-5 py-2.5 rounded-full bg-slate-900 text-white dark:bg-white dark:text-slate-900 text-xs font-bold font-mono hover:opacity-90 transition-opacity cursor-pointer shadow-md"
-                        >
-                          Return to Dashboard Overview
-                        </button>
-                      </div>
-                    </div>
-                  )}
                 </main>
 
-                {/* Floating Modern Mobile Bottom Navigation Dock (Inspired by Modern Reference) */}
+                {/* Floating Modern Mobile Bottom Navigation Dock */}
                 <nav className="md:hidden fixed bottom-3 left-3 right-3 z-40 max-w-md mx-auto bg-slate-950/90 dark:bg-slate-900/95 text-white backdrop-blur-2xl border border-white/15 px-2 py-1.5 rounded-full shadow-2xl flex items-center justify-around print:hidden">
                   {[
                     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -1057,12 +908,9 @@ export default function App() {
                     );
                   })}
                 </nav>
-              </div>
-
             </div>
-          )}
-        </div>
-      )}
+          </div>
+        )}
       <PwaInstallPrompt />
     </div>
   );

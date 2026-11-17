@@ -11,14 +11,13 @@ import {
   deleteDoc, 
   query 
 } from "../firebase";
-import { Employee, DevotionSchedule, DevotionSettings, DevotionRotationState } from "../types";
+import { Employee, DevotionSchedule, DevotionSettings } from "../types";
 import { 
   Sparkles, 
   Calendar, 
-  UserCheck, 
-  Upload, 
+  CalendarDays,
+  ArrowLeftRight,
   Download,
-  Image as ImageIcon, 
   Plus, 
   Trash2, 
   Edit3, 
@@ -28,33 +27,20 @@ import {
   CheckCircle, 
   Check,
   Repeat, 
-  Eye, 
   X, 
   Search, 
   UserX, 
-  FileImage, 
   RefreshCw, 
-  Heart, 
-  ChevronRight, 
-  ShieldAlert, 
   LayoutGrid, 
   List, 
-  Shuffle,
-  History,
-  AlertTriangle,
-  Archive
+  History
 } from "lucide-react";
 import DevotionFlyerCard from "./DevotionFlyerCard";
 import DevotionLineupExportModal from "./DevotionLineupExportModal";
 import EmployeeSearchInput from "./EmployeeSearchInput";
 import { 
-  OFFICIAL_FLIER_ROSTER, 
-  generateFairRoster,
-  generateNextFairAssignment,
   maintainRollingSchedule,
-  generateNextRotationPair,
-  initializeRotationState,
-  getNextRotationSuggestion,
+  getNextManualScheduleDate,
   generateLoopedSchedule,
   addDaysToDateStr,
   isWeekendDateStr,
@@ -94,22 +80,17 @@ export default function DevotionManager({ employees, currentUser }: DevotionMana
   const [substituteReason, setSubstituteReason] = useState("");
   const [substituteSaving, setSubstituteSaving] = useState(false);
 
-  // Rolling Queue state
-  const [isRollingQueue, setIsRollingQueue] = useState(false);
-
   // View mode switcher: "flyer" (interactive replica 15 rows), "table" (master spreadsheet 15 rows), "history" (completed archive)
   const [viewMode, setViewMode] = useState<"flyer" | "table" | "history">("flyer");
-  const [rotationState, setRotationState] = useState<DevotionRotationState | null>(null);
 
-  // Fair Cycle Auto-generate states
-  const [isAutoGenerateModalOpen, setIsAutoGenerateModalOpen] = useState(false);
-  const [autoGenStartDate, setAutoGenStartDate] = useState("2026-11-06");
-  const [autoGenDaysCount, setAutoGenDaysCount] = useState(5); // Default to 5 business days
-  const [autoGenExcludeWeekends, setAutoGenExcludeWeekends] = useState(true); // Strictly Mon-Fri
-  const [autoGenerating, setAutoGenerating] = useState(false);
-  const [rosterSource, setRosterSource] = useState<"official" | "employees" | "custom">("official");
-  const [customRosterInput, setCustomRosterInput] = useState<string>(OFFICIAL_FLIER_ROSTER.join(", "));
-  const [fairPreview, setFairPreview] = useState<any[]>([]);
+  // Manual Multi-Day Planner modal states
+  const [isBatchManualModalOpen, setIsBatchManualModalOpen] = useState(false);
+  const [batchStartDate, setBatchStartDate] = useState("");
+  const [batchDaysCount, setBatchDaysCount] = useState(5);
+  const [batchRows, setBatchRows] = useState<
+    { date: string; devotionId: string; devotionName: string; prayerId: string; prayerName: string }[]
+  >([]);
+  const [batchSaving, setBatchSaving] = useState(false);
 
   // Loop Devotions Forward Modal States
   const [isLoopModalOpen, setIsLoopModalOpen] = useState(false);
@@ -234,21 +215,9 @@ export default function DevotionManager({ employees, currentUser }: DevotionMana
       }
     );
 
-    // Listen to devotion rotation state
-    const unsubRotation = onSnapshot(
-      doc(db, "devotion_settings", "rotation_state"),
-      (snap) => {
-        if (snap.exists()) {
-          setRotationState(snap.data() as DevotionRotationState);
-        }
-      },
-      (err) => console.error("Error fetching rotation state:", err)
-    );
-
     return () => {
       unsub();
       unsubSettings();
-      unsubRotation();
     };
   }, []);
 
@@ -289,8 +258,8 @@ export default function DevotionManager({ employees, currentUser }: DevotionMana
     }
   };
 
-  // Open Add/Edit Modal
-  const openAddModal = (existing?: DevotionSchedule) => {
+  // Open Add/Edit Modal (Strict Manual Admin Assignment — no random auto-selection)
+  const openAddModal = (existing?: DevotionSchedule, presetDate?: string) => {
     if (existing) {
       setEditingSchedule(existing);
       setFormDate(existing.date);
@@ -303,19 +272,30 @@ export default function DevotionManager({ employees, currentUser }: DevotionMana
       setFormScripture(existing.scripture || "");
       setFormNotes(existing.notes || "");
     } else {
-      const suggestion = getNextRotationSuggestion(activeEmployees, schedules);
-      setEditingSchedule(null);
-      setFormDate(suggestion.nextDate);
-      setFormDevotionLeaderId(suggestion.devotionId);
-      setFormDevotionLeaderName(suggestion.devotionName);
-      setFormPrayerLeaderId(suggestion.prayerId);
-      setFormPrayerLeaderName(suggestion.prayerName);
-      setFormClosingPrayerLeaderName("");
-      setFormTopic("Daily Devotion & Shift Alignment");
-      setFormScripture("Philippians 4:6-7");
-      setFormNotes("Fair Cycle Continuous Rotation");
+      const targetDate = presetDate ? ensureWeekdayDateStr(presetDate) : getNextManualScheduleDate(schedules, todayStr);
+      const existingOnTarget = schedules.find((s) => s.date === targetDate);
+      setEditingSchedule(existingOnTarget || null);
+      setFormDate(targetDate);
+      setFormDevotionLeaderId(existingOnTarget?.devotionLeaderId || "");
+      setFormDevotionLeaderName(existingOnTarget?.devotionLeaderName || "");
+      setFormPrayerLeaderId(existingOnTarget?.prayerLeaderId || "");
+      setFormPrayerLeaderName(existingOnTarget?.prayerLeaderName || "");
+      setFormClosingPrayerLeaderName(existingOnTarget?.closingPrayerLeaderName || "");
+      setFormTopic(existingOnTarget?.topic || "Daily Devotion & Shift Alignment");
+      setFormScripture(existingOnTarget?.scripture || "Philippians 4:6-7");
+      setFormNotes(existingOnTarget?.notes || "Admin Manual Assignment");
     }
     setIsAddingModalOpen(true);
+  };
+
+  // Swap Devotion and Prayer leaders in Single Entry Modal
+  const handleSwapFormLeaders = () => {
+    const prevDevId = formDevotionLeaderId;
+    const prevDevName = formDevotionLeaderName;
+    setFormDevotionLeaderId(formPrayerLeaderId);
+    setFormDevotionLeaderName(formPrayerLeaderName);
+    setFormPrayerLeaderId(prevDevId);
+    setFormPrayerLeaderName(prevDevName);
   };
 
   // Save Schedule Entry (Strictly Date-Based Keying: docId === YYYY-MM-DD)
@@ -505,260 +485,146 @@ export default function DevotionManager({ employees, currentUser }: DevotionMana
     }
   };
 
-  // Automatic Daily Rolling Queue & Schedule Maintenance:
-  // Maintains 15 upcoming schedule rows in DB (10 visible to employees, 15 to admins).
-  // Archives past schedules (date < todayStr) to "completed", NEVER deletes from database!
+  // Archive expired past schedules automatically (no random schedule generation)
   useEffect(() => {
     if (loading || schedules.length === 0) return;
     maintainRollingSchedule(db, todayStr, employees, schedules, 15).catch((err) => {
-      console.warn("Devotion auto-maintain note:", err);
+      console.warn("Devotion archive maintenance note:", err);
     });
   }, [schedules.length, todayStr, employees.length, loading]);
 
-  // Manual Advance 1 Day: Archives today's top schedule to History (DO NOT DELETE)
-  // and appends exactly 1 new fair cycle assignment at the bottom to maintain 15 upcoming rows.
-  const handleRollDailyQueue = async () => {
-    if (activeEmployees.length < 2) {
-      showToast("Cannot advance queue: at least 2 active employees are required.", "error");
-      return;
+  // -------------------------------------------------------------
+  // PLAN MULTIPLE DAYS MANUALLY (Mon–Fri, Admin Explicitly Picks Each Day)
+  // -------------------------------------------------------------
+  const buildBatchManualRows = (startDateStr: string, daysCount: number) => {
+    const cleanStart = ensureWeekdayDateStr(startDateStr || getNextManualScheduleDate(schedules, todayStr));
+    const rows: { date: string; devotionId: string; devotionName: string; prayerId: string; prayerName: string }[] = [];
+    let cursor = cleanStart;
+    for (let i = 0; i < daysCount; i++) {
+      const existing = schedules.find((s) => s.date === cursor);
+      rows.push({
+        date: cursor,
+        devotionId: existing?.devotionLeaderId || "",
+        devotionName: existing?.devotionLeaderName || "",
+        prayerId: existing?.prayerLeaderId || "",
+        prayerName: existing?.prayerLeaderName || ""
+      });
+      cursor = addDaysToDateStr(cursor, 1, true);
     }
-
-    if (upcomingSchedules.length === 0) {
-      showToast("No upcoming schedules found to advance. Please add or loop devotion entries first.", "info");
-      return;
-    }
-
-    setIsRollingQueue(true);
-    try {
-      // 1. Mark top upcoming schedule completed (ARCHIVED IN HISTORY - NEVER DELETED)
-      const topSchedule = upcomingSchedules[0];
-      if (topSchedule && topSchedule.id) {
-        await updateDoc(doc(db, "devotion_schedules", topSchedule.id), {
-          status: "completed",
-          completedAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          updatedBy: currentUser?.email || "Admin (Queue Advanced)"
-        });
-      }
-
-      // 2. Load or initialize rotation state
-      const stateDocRef = doc(db, "devotion_settings", "rotation_state");
-      let rotState: DevotionRotationState;
-      const stateSnap = await getDoc(stateDocRef);
-      if (stateSnap.exists()) {
-        rotState = initializeRotationState(
-          activeEmployees.map(e => e.fullName.trim()),
-          stateSnap.data() as DevotionRotationState
-        );
-      } else {
-        rotState = initializeRotationState(activeEmployees.map(e => e.fullName.trim()));
-      }
-
-      // 3. Calculate next weekday date at bottom (strictly skipping Saturday & Sunday)
-      const remainingUpcoming = upcomingSchedules.slice(1);
-      const lastDateStr = remainingUpcoming.length > 0 
-        ? remainingUpcoming[remainingUpcoming.length - 1].date 
-        : topSchedule.date;
-      const nextDateStr = addDaysToDateStr(lastDateStr, 1, true);
-
-      const lastDev = remainingUpcoming.length > 0 
-        ? remainingUpcoming[remainingUpcoming.length - 1].devotionLeaderName 
-        : topSchedule.devotionLeaderName;
-      const lastPray = remainingUpcoming.length > 0 
-        ? remainingUpcoming[remainingUpcoming.length - 1].prayerLeaderName 
-        : topSchedule.prayerLeaderName;
-
-      // 4. Generate next fair rotation pair (respecting separate cycles & cohort locking)
-      const nextPair = generateNextRotationPair(activeEmployees, rotState, lastDev, lastPray);
-      rotState = nextPair.updatedState;
-
-      const matchedDev = activeEmployees.find(e => e.fullName.toLowerCase() === nextPair.devotion.toLowerCase());
-      const matchedPray = activeEmployees.find(e => e.fullName.toLowerCase() === nextPair.prayer.toLowerCase());
-
-      const newEntry: Partial<DevotionSchedule> = {
-        id: nextDateStr,
-        date: nextDateStr,
-        devotionLeaderId: matchedDev?.id || "",
-        devotionLeaderName: nextPair.devotion,
-        prayerLeaderId: matchedPray?.id || "",
-        prayerLeaderName: nextPair.prayer,
-        closingPrayerLeaderName: "",
-        topic: "Daily Devotion & Shift Alignment",
-        scripture: "Philippians 4:6-7",
-        notes: `Rolling Queue Advance (Dev Cycle #${nextPair.devCycleNumber}, Prayer Cycle #${nextPair.prayCycleNumber})`,
-        imageUrl: "/assets/aistudio/image_17b76ed3.png",
-        status: "upcoming",
-        cycleDevotionNumber: nextPair.devCycleNumber,
-        cyclePrayerNumber: nextPair.prayCycleNumber,
-        cycleDevotionCohort: [...rotState.devotionCohort],
-        cyclePrayerCohort: [...rotState.prayerCohort],
-        isAbsent: false,
-        isPrayerAbsent: false,
-        updatedAt: new Date().toISOString(),
-        updatedBy: currentUser?.email || "Admin (Manual Roll)"
-      };
-
-      await setDoc(doc(db, "devotion_schedules", nextDateStr), newEntry, { merge: true });
-      await setDoc(stateDocRef, { ...rotState, lastMaintainedAt: new Date().toISOString() });
-      localStorage.setItem("devotion_initial_seeded_v2", "true");
-
-      showToast(
-        `Advanced 1 Day: Archived ${topSchedule.date} (${topSchedule.devotionLeaderName}) to History, appended ${nextDateStr} (${nextPair.devotion} & ${nextPair.prayer}) at bottom!`,
-        "success"
-      );
-    } catch (err) {
-      console.error("Error advancing queue:", err);
-      showToast("Failed to advance rolling queue.", "error");
-    } finally {
-      setIsRollingQueue(false);
-    }
+    return rows;
   };
 
-  // Resolve selected roster pool of team members
-  const getSelectedRosterPool = (): string[] => {
-    if (rosterSource === "official") {
-      return OFFICIAL_FLIER_ROSTER;
-    }
-    if (rosterSource === "employees") {
-      const names = activeEmployees.map((e) => e.fullName.trim()).filter(Boolean);
-      return names.length > 0 ? names : OFFICIAL_FLIER_ROSTER;
-    }
-    // Custom comma-separated input
-    const parsed = customRosterInput
-      .split(",")
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0);
-    return parsed.length >= 2 ? parsed : OFFICIAL_FLIER_ROSTER;
+  const openBatchManualModal = () => {
+    const nextStart = getNextManualScheduleDate(schedules, todayStr);
+    setBatchStartDate(nextStart);
+    setBatchDaysCount(5);
+    setBatchRows(buildBatchManualRows(nextStart, 5));
+    setIsBatchManualModalOpen(true);
   };
 
-  // Generate Fair Randomizer Preview
-  const handleGenerateFairPreview = (targetStartDate?: string, targetDays?: number, targetExcludeWeekends?: boolean) => {
-    const pool = getSelectedRosterPool();
-    if (pool.length < 2) {
-      showToast("Need at least 2 team members in the roster pool.", "error");
-      return;
-    }
-    const startDate = targetStartDate || autoGenStartDate;
-    const days = targetDays || autoGenDaysCount;
-    const excludeWk = targetExcludeWeekends !== undefined ? targetExcludeWeekends : autoGenExcludeWeekends;
-    const previewList = generateFairRoster(
-      pool,
-      startDate,
-      days,
-      excludeWk,
-      schedules,
-      activeEmployees
-    );
-    setFairPreview(previewList);
-  };
-
-  // Commit Fair Randomizer Schedule to Firestore
-  const handleCommitFairRoster = async () => {
-    if (fairPreview.length === 0) {
-      handleGenerateFairPreview();
-      return;
-    }
-
-    setAutoGenerating(true);
-    try {
-      const activeFlyerImage = "/assets/aistudio/image_17b76ed3.png";
-
-      for (const item of fairPreview) {
-        // Try to match employee ID from directory if available
-        const matchedDevEmp = employees.find(
-          (e) => e.fullName.toLowerCase() === item.devotion.toLowerCase() ||
-                 (e.fullName.toLowerCase().includes(item.devotion.toLowerCase()) && item.devotion.length >= 3)
-        );
-        const matchedPrayEmp = employees.find(
-          (e) => e.fullName.toLowerCase() === item.prayer.toLowerCase() ||
-                 (e.fullName.toLowerCase().includes(item.prayer.toLowerCase()) && item.prayer.length >= 3)
-        );
-
-        const data: Partial<DevotionSchedule> = {
-          id: item.date,
-          date: item.date,
-          devotionLeaderId: matchedDevEmp?.id || "",
-          devotionLeaderName: item.devotion,
-          prayerLeaderId: matchedPrayEmp?.id || "",
-          prayerLeaderName: item.prayer,
-          closingPrayerLeaderName: "",
-          topic: "Daily Devotion & Shift Alignment",
-          scripture: "Philippians 4:6-7",
-          notes: `Fair Exhaustion Cycle ${item.cycleNumber} (Day ${item.dayInCycle} of ${item.cycleTotal})`,
-          imageUrl: activeFlyerImage,
-          status: item.date < todayStr ? "completed" : "upcoming",
-          isAbsent: false,
-          isPrayerAbsent: false,
-          updatedAt: new Date().toISOString(),
-          updatedBy: currentUser?.email || "Admin",
-        };
-
-        const existing = schedules.find((s) => s.date === item.date);
-        if (existing && existing.id && existing.id !== item.date) {
-          await deleteDoc(doc(db, "devotion_schedules", existing.id)).catch(() => {});
+  const handleBatchLeaderChange = (rowIdx: number, role: "devotion" | "prayer", empId: string) => {
+    const emp = activeEmployees.find((e) => e.id === empId);
+    setBatchRows((prev) =>
+      prev.map((r, i) => {
+        if (i !== rowIdx) return r;
+        if (role === "devotion") {
+          return { ...r, devotionId: emp?.id || "", devotionName: emp?.fullName || "" };
         }
-        await setDoc(doc(db, "devotion_schedules", item.date), data, { merge: true });
-      }
+        return { ...r, prayerId: emp?.id || "", prayerName: emp?.fullName || "" };
+      })
+    );
+  };
 
-      // Update rotation_state in Firestore so future single adds and rolling maintenance stay in sync
-      const stateDocRef = doc(db, "devotion_settings", "rotation_state");
-      const assignedDevs = fairPreview.map(p => p.devotion);
-      const assignedPrays = fairPreview.map(p => p.prayer);
-      await setDoc(stateDocRef, {
-        devotionAssigned: assignedDevs,
-        prayerAssigned: assignedPrays,
-        lastMaintainedAt: new Date().toISOString()
-      }, { merge: true }).catch(() => {});
+  const handleSwapBatchRow = (rowIdx: number) => {
+    setBatchRows((prev) =>
+      prev.map((r, i) =>
+        i === rowIdx
+          ? {
+              ...r,
+              devotionId: r.prayerId,
+              devotionName: r.prayerName,
+              prayerId: r.devotionId,
+              prayerName: r.devotionName
+            }
+          : r
+      )
+    );
+  };
 
-      localStorage.setItem("devotion_initial_seeded_v2", "true");
+  const handleSaveBatchManual = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const readyRows = batchRows.filter((r) => r.devotionName.trim() && r.prayerName.trim());
+    if (readyRows.length === 0) {
+      showToast("Select at least one day with both Devotion and Prayer leaders.", "error");
+      return;
+    }
+
+    setBatchSaving(true);
+    try {
+      const activeFlyerImage = devotionSettings?.scheduleImageUrl || "/assets/aistudio/image_17b76ed3.png";
+      await Promise.all(
+        readyRows.map(async (item) => {
+          const existing = schedules.find((s) => s.date === item.date);
+          if (existing && existing.id && existing.id !== item.date) {
+            await deleteDoc(doc(db, "devotion_schedules", existing.id)).catch(() => {});
+          }
+          const payload: Partial<DevotionSchedule> = {
+            id: item.date,
+            date: item.date,
+            devotionLeaderId: item.devotionId,
+            devotionLeaderName: item.devotionName.trim(),
+            prayerLeaderId: item.prayerId,
+            prayerLeaderName: item.prayerName.trim(),
+            closingPrayerLeaderName: existing?.closingPrayerLeaderName || "",
+            topic: existing?.topic || "Daily Devotion & Shift Alignment",
+            scripture: existing?.scripture || "Philippians 4:6-7",
+            notes: "Admin Manual Multi-Day Schedule",
+            imageUrl: activeFlyerImage,
+            status: item.date < todayStr ? "completed" : "upcoming",
+            isAbsent: existing?.isAbsent ?? false,
+            isPrayerAbsent: existing?.isPrayerAbsent ?? false,
+            updatedAt: new Date().toISOString(),
+            updatedBy: currentUser?.email || "Admin"
+          };
+          return setDoc(doc(db, "devotion_schedules", item.date), payload, { merge: true });
+        })
+      );
 
       await addDoc(collection(db, "audit_logs"), {
         user: currentUser?.email || "Admin",
-        action: "Fair Cycle Devotion Generated",
-        details: `Generated ${fairPreview.length} devotion days using Fair Cycle Exhaustion Randomizer starting from ${autoGenStartDate}.`,
+        action: "Manual Multi-Day Devotion Planned",
+        details: `Admin manually assigned ${readyRows.length} devotion shift(s) starting from ${readyRows[0].date}.`,
         timestamp: new Date().toISOString()
-      });
+      }).catch(() => {});
 
-      showToast(`Successfully generated and published ${fairPreview.length} days of fair cycle devotion!`, "success");
-      setIsAutoGenerateModalOpen(false);
-      setFairPreview([]);
+      showToast(`Saved ${readyRows.length} manually assigned devotion shift(s)!`, "success");
+      setIsBatchManualModalOpen(false);
     } catch (err) {
-      console.error("Error committing fair schedule:", err);
-      showToast("Failed to commit schedule. Please try again.", "error");
+      console.error("Error saving batch manual devotions:", err);
+      showToast("Failed to save manual schedule batch. Please try again.", "error");
     } finally {
-      setAutoGenerating(false);
+      setBatchSaving(false);
     }
   };
 
   // -------------------------------------------------------------
-  // LOOP DEVOTIONS FORWARD (Strictly Monday–Friday; Weekends Skipped)
+  // REPEAT MANUAL PATTERN FORWARD (Strictly Monday–Friday; Admin Defines Every Pair)
   // -------------------------------------------------------------
   const openLoopModal = () => {
-    // 1. Extract existing schedules sorted by date
     const sorted = [...schedules]
       .filter((s) => Boolean(s.date) && Boolean(s.devotionLeaderName) && Boolean(s.prayerLeaderName))
       .sort((a, b) => a.date.localeCompare(b.date));
 
-    // Deduce initial base pattern: either current schedules' pairs or fallback to active employees
-    let base: { devotion: string; prayer: string }[] = [];
-    if (sorted.length > 0) {
-      base = sorted.map((s) => ({
-        devotion: s.devotionLeaderName,
-        prayer: s.prayerLeaderName,
-      }));
-    } else if (activeEmployees.length >= 2) {
-      const emps = activeEmployees.map((e) => e.fullName.trim());
-      for (let i = 0; i < Math.min(5, emps.length); i++) {
-        base.push({
-          devotion: emps[i],
-          prayer: emps[(i + 1) % emps.length],
-        });
-      }
-    }
+    const base: { devotion: string; prayer: string }[] =
+      sorted.length > 0
+        ? sorted.map((s) => ({
+            devotion: s.devotionLeaderName,
+            prayer: s.prayerLeaderName,
+          }))
+        : [{ devotion: "", prayer: "" }];
 
     setLoopBasePattern(base);
 
-    // Default start date: next weekday after the last scheduled date (or today if none)
     const nextStart = sorted.length > 0
       ? addDaysToDateStr(sorted[sorted.length - 1].date, 1, true)
       : ensureWeekdayDateStr(todayStr);
@@ -766,10 +632,8 @@ export default function DevotionManager({ employees, currentUser }: DevotionMana
     setLoopStartDate(nextStart);
     setLoopDaysCount(10);
 
-    // Generate initial preview
-    if (base.length > 0) {
-      const prev = generateLoopedSchedule(base, nextStart, 10);
-      setLoopPreview(prev);
+    if (sorted.length > 0) {
+      setLoopPreview(generateLoopedSchedule(base, nextStart, 10));
     } else {
       setLoopPreview([]);
     }
@@ -939,9 +803,34 @@ export default function DevotionManager({ employees, currentUser }: DevotionMana
             </p>
           </div>
 
-          {/* Action buttons toolbar */}
+          {/* Action buttons toolbar (100% Admin Manual Control) */}
           <div className="w-full pt-4 border-t border-indigo-500/20 flex flex-wrap items-center gap-2.5">
-            {/* Primary Action: Download Lineup as Image to send to employees */}
+            <button
+              onClick={() => openAddModal()}
+              className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold font-mono transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md flex-1 sm:flex-none"
+            >
+              <Plus className="w-4 h-4 shrink-0" />
+              <span>Assign / Add Day</span>
+            </button>
+
+            <button
+              onClick={openBatchManualModal}
+              className="px-3.5 py-2.5 rounded-xl bg-emerald-600/30 hover:bg-emerald-600/50 border border-emerald-500/40 text-emerald-200 text-xs font-bold font-mono transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm flex-1 sm:flex-none"
+              title="Manually pick Devotion & Prayer leaders across multiple upcoming weekdays at once"
+            >
+              <CalendarDays className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>Plan Multiple Days</span>
+            </button>
+
+            <button
+              onClick={() => openLoopModal()}
+              className="px-3.5 py-2.5 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-500/40 text-indigo-200 text-xs font-bold font-mono transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm flex-1 sm:flex-none"
+              title="Repeat your manually set leader sequence across upcoming Monday–Friday shifts"
+            >
+              <Repeat className="w-4 h-4 text-indigo-400 shrink-0" />
+              <span>Repeat Manual Pattern</span>
+            </button>
+
             <button
               onClick={() => setIsLineupExportModalOpen(true)}
               className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs font-black font-mono transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-amber-500/20 flex-1 sm:flex-none ring-2 ring-amber-400/40"
@@ -953,84 +842,16 @@ export default function DevotionManager({ employees, currentUser }: DevotionMana
             </button>
 
             <button
-              onClick={() => openLoopModal()}
-              className="px-3.5 py-2.5 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-500/40 text-indigo-200 text-xs font-bold font-mono transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm flex-1 sm:flex-none"
-              title="Loop your current entered devotions forward across upcoming Monday–Friday business days (skipping Sat & Sun)"
-            >
-              <Repeat className="w-4 h-4 text-indigo-400 shrink-0" />
-              <span>Loop Devotions Forward</span>
-            </button>
-
-            <button
-              onClick={handleRollDailyQueue}
-              disabled={isRollingQueue}
-              className="px-3.5 py-2.5 rounded-xl bg-emerald-600/30 hover:bg-emerald-600/50 border border-emerald-500/40 text-emerald-200 text-xs font-bold font-mono transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm flex-1 sm:flex-none"
-              title="Manually advance 1 day: Removes top row and adds newly generated fair random pair to the bottom"
-            >
-              {isRollingQueue ? (
-                <>
-                  <RefreshCw className="w-4 h-4 animate-spin text-emerald-400 shrink-0" />
-                  <span>Rolling Queue...</span>
-                </>
-              ) : (
-                <>
-                  <Shuffle className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>Advance 1 Day (Roll Queue)</span>
-                </>
-              )}
-            </button>
-
-            <button
-              onClick={() => {
-                const nextDate = schedules.length > 0
-                  ? addDaysToDateStr(schedules.reduce((max, s) => s.date > max ? s.date : max, schedules[0].date), 1, true)
-                  : ensureWeekdayDateStr(todayStr);
-                setAutoGenStartDate(nextDate);
-                setAutoGenDaysCount(5);
-                setAutoGenExcludeWeekends(true);
-                handleGenerateFairPreview(nextDate, 5, true);
-                setIsAutoGenerateModalOpen(true);
-              }}
-              className="px-3.5 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-750 border border-zinc-700 text-zinc-200 text-xs font-bold font-mono transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm flex-1 sm:flex-none"
-            >
-              <Shuffle className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span>Fair Cycle Settings</span>
-            </button>
-
-            <button
               onClick={() => setIsClearAllModalOpen(true)}
-              className="px-3.5 py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-300 text-xs font-bold font-mono transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm flex-1 sm:flex-none"
+              className="px-3.5 py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-300 text-xs font-bold font-mono transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm flex-1 sm:flex-none sm:ml-auto"
               title="Delete all current devotion schedules to start fresh"
             >
               <Trash2 className="w-4 h-4 text-rose-400 shrink-0" />
-              <span>Clear All Schedules</span>
-            </button>
-
-            <button
-              onClick={() => openAddModal()}
-              className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold font-mono transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md flex-1 sm:flex-none sm:ml-auto"
-            >
-              <Plus className="w-4 h-4 shrink-0" />
-              <span>Add Schedule Entry</span>
+              <span>Clear All</span>
             </button>
           </div>
         </div>
       </div>
-
-      {/* INSUFFICIENT ELIGIBLE STAFF WARNING BANNER */}
-      {activeEmployees.length < 2 && (
-        <div className="bg-amber-950/40 border border-amber-500/50 rounded-2xl p-4 flex items-start gap-3 shadow-lg">
-          <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-          <div className="space-y-1 text-xs">
-            <h4 className="font-bold text-amber-300 uppercase tracking-wide">
-              Insufficient Eligible Staff for Auto-Scheduling
-            </h4>
-            <p className="text-zinc-300 leading-relaxed font-sans">
-              At least 2 active employees are required to generate fair Devotion & Prayer rotation schedules without mutual exclusion conflicts. Please ensure at least 2 staff members have "Active" status in Employee Directory.
-            </p>
-          </div>
-        </div>
-      )}
 
       {/* TODAY'S DEVOTION SPOTLIGHT CARD */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -1057,10 +878,10 @@ export default function DevotionManager({ employees, currentUser }: DevotionMana
               <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
                 <button
                   onClick={() => openAddModal(todaySchedule)}
-                  className="px-2.5 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-300 text-xs font-mono font-semibold flex items-center gap-1.5 border border-zinc-800 cursor-pointer"
+                  className="px-3 py-1.5 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/35 text-indigo-300 text-xs font-mono font-bold flex items-center gap-1.5 border border-indigo-500/30 cursor-pointer"
                 >
                   <Edit3 className="w-3.5 h-3.5" />
-                  <span>Edit</span>
+                  <span>Change Leaders</span>
                 </button>
               </div>
             )}
@@ -1077,7 +898,7 @@ export default function DevotionManager({ employees, currentUser }: DevotionMana
                 }`}>
                   <div className="flex justify-between items-start gap-2 mb-2">
                     <span className="text-[10px] font-mono uppercase tracking-wider font-bold text-indigo-300">
-                      📖 DEVOTION LEADER
+                      DEVOTION LEADER
                     </span>
                     {todaySchedule.isAbsent ? (
                       <span className="px-2 py-0.5 rounded text-[10px] font-mono font-black uppercase bg-rose-500/20 text-rose-400 border border-rose-500/30 flex items-center gap-1 shrink-0">
@@ -1085,7 +906,7 @@ export default function DevotionManager({ employees, currentUser }: DevotionMana
                       </span>
                     ) : (
                       <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1 shrink-0">
-                        <CheckCircle className="w-3 h-3" /> Scheduled
+                        <CheckCircle className="w-3 h-3" /> Assigned
                       </span>
                     )}
                   </div>
@@ -1097,14 +918,22 @@ export default function DevotionManager({ employees, currentUser }: DevotionMana
                       </div>
                       <div className="text-lg font-black text-amber-400 mt-1 flex items-center gap-2">
                         <Repeat className="w-4 h-4 text-amber-400 shrink-0" />
-                        <span>Substitute: {todaySchedule.substituteDevotionLeaderName}</span>
+                        <span>Sub: {todaySchedule.substituteDevotionLeaderName}</span>
                       </div>
-                      <button
-                        onClick={() => handleRestoreOriginalLeader(todaySchedule, "devotion")}
-                        className="mt-2 text-[10px] font-mono text-zinc-400 hover:text-white underline cursor-pointer"
-                      >
-                        Restore original leader
-                      </button>
+                      <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                        <button
+                          onClick={() => openSubstituteModal(todaySchedule, "devotion")}
+                          className="px-2 py-1 rounded bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 text-[10px] font-mono font-bold cursor-pointer"
+                        >
+                          Change Sub
+                        </button>
+                        <button
+                          onClick={() => handleRestoreOriginalLeader(todaySchedule, "devotion")}
+                          className="text-[10px] font-mono text-zinc-400 hover:text-white underline cursor-pointer"
+                        >
+                          Restore original
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     <div>
@@ -1113,15 +942,15 @@ export default function DevotionManager({ employees, currentUser }: DevotionMana
                       </div>
                       <p className="text-xs text-zinc-400 mt-0.5">Leads Scripture & Spiritual Reflection</p>
                       
-                      {!todaySchedule.isAbsent && (
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
                         <button
                           onClick={() => openSubstituteModal(todaySchedule, "devotion")}
-                          className="mt-3 px-2.5 py-1 rounded bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-800/40 text-[11px] font-mono font-bold flex items-center gap-1.5 cursor-pointer"
+                          className="px-2.5 py-1 rounded bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-800/40 text-[11px] font-mono font-bold flex items-center gap-1.5 cursor-pointer"
                         >
                           <UserX className="w-3 h-3 shrink-0" />
-                          <span>Absent? Swap / Assign Substitute</span>
+                          <span>Absent? Assign Sub</span>
                         </button>
-                      )}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1134,7 +963,7 @@ export default function DevotionManager({ employees, currentUser }: DevotionMana
                 }`}>
                   <div className="flex justify-between items-start gap-2 mb-2">
                     <span className="text-[10px] font-mono uppercase tracking-wider font-bold text-sky-300">
-                      🙏 PRAYER LEADER
+                      PRAYER LEADER
                     </span>
                     {todaySchedule.isPrayerAbsent ? (
                       <span className="px-2 py-0.5 rounded text-[10px] font-mono font-black uppercase bg-rose-500/20 text-rose-400 border border-rose-500/30 flex items-center gap-1 shrink-0">
@@ -1142,7 +971,7 @@ export default function DevotionManager({ employees, currentUser }: DevotionMana
                       </span>
                     ) : (
                       <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1 shrink-0">
-                        <CheckCircle className="w-3 h-3" /> Scheduled
+                        <CheckCircle className="w-3 h-3" /> Assigned
                       </span>
                     )}
                   </div>
@@ -1154,14 +983,22 @@ export default function DevotionManager({ employees, currentUser }: DevotionMana
                       </div>
                       <div className="text-lg font-black text-amber-400 mt-1 flex items-center gap-2">
                         <Repeat className="w-4 h-4 text-amber-400 shrink-0" />
-                        <span>Substitute: {todaySchedule.substitutePrayerLeaderName}</span>
+                        <span>Sub: {todaySchedule.substitutePrayerLeaderName}</span>
                       </div>
-                      <button
-                        onClick={() => handleRestoreOriginalLeader(todaySchedule, "prayer")}
-                        className="mt-2 text-[10px] font-mono text-zinc-400 hover:text-white underline cursor-pointer"
-                      >
-                        Restore original leader
-                      </button>
+                      <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                        <button
+                          onClick={() => openSubstituteModal(todaySchedule, "prayer")}
+                          className="px-2 py-1 rounded bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 text-[10px] font-mono font-bold cursor-pointer"
+                        >
+                          Change Sub
+                        </button>
+                        <button
+                          onClick={() => handleRestoreOriginalLeader(todaySchedule, "prayer")}
+                          className="text-[10px] font-mono text-zinc-400 hover:text-white underline cursor-pointer"
+                        >
+                          Restore original
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     <div>
@@ -1170,15 +1007,15 @@ export default function DevotionManager({ employees, currentUser }: DevotionMana
                       </div>
                       <p className="text-xs text-zinc-400 mt-0.5">Leads Opening & Intercessory Prayer</p>
                       
-                      {!todaySchedule.isPrayerAbsent && (
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
                         <button
                           onClick={() => openSubstituteModal(todaySchedule, "prayer")}
-                          className="mt-3 px-2.5 py-1 rounded bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-800/40 text-[11px] font-mono font-bold flex items-center gap-1.5 cursor-pointer"
+                          className="px-2.5 py-1 rounded bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-800/40 text-[11px] font-mono font-bold flex items-center gap-1.5 cursor-pointer"
                         >
                           <UserX className="w-3 h-3 shrink-0" />
-                          <span>Absent? Swap / Assign Substitute</span>
+                          <span>Absent? Assign Sub</span>
                         </button>
-                      )}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1187,113 +1024,101 @@ export default function DevotionManager({ employees, currentUser }: DevotionMana
           ) : (
             <div className="p-8 rounded-xl bg-zinc-900/40 border border-zinc-800/60 text-center space-y-3">
               <AlertCircle className="w-8 h-8 text-amber-400 mx-auto" />
-              <h4 className="text-sm font-bold text-white">No Devotion Schedule Logged for Today ({todayStr})</h4>
+              <h4 className="text-sm font-bold text-white">No Devotion Leaders Assigned for Today ({todayStr})</h4>
               <p className="text-xs text-zinc-400 max-w-md mx-auto">
-                Click below to add today's leaders or use the Auto-Fill Cycle to populate the weekly roster.
+                Click below to pick today's Devotion and Prayer leaders manually, or use Plan Multiple Days to fill the week.
               </p>
               <button
-                onClick={() => openAddModal()}
+                onClick={() => openAddModal(undefined, ensureWeekdayDateStr(todayStr))}
                 className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold font-mono inline-flex items-center gap-1.5 cursor-pointer shadow-sm"
               >
                 <Plus className="w-4 h-4" />
-                <span>Assign Leaders for Today</span>
+                <span>Assign Today's Leaders</span>
               </button>
             </div>
           )}
         </div>
 
-        {/* Schedule Flyer / Graphic Widget */}
-        {/* Daily Rolling Queue & Fair Cycle Engine Status Widget */}
+        {/* Manual Roster Controls & Summary Widget */}
         <div className="lg:col-span-4 bg-zinc-950 border border-zinc-800 rounded-2xl p-5 sm:p-6 shadow-xl flex flex-col justify-between">
           <div className="space-y-4">
             <div className="flex items-center justify-between gap-2 border-b border-zinc-800/80 pb-3">
-              <div className="flex items-center gap-2 text-emerald-400">
-                <RefreshCw className="w-4 h-4 animate-spin text-emerald-400 shrink-0" />
-                <h4 className="text-sm font-bold text-white">Daily Rolling Queue</h4>
+              <div className="flex items-center gap-2 text-indigo-400">
+                <CalendarDays className="w-4 h-4 text-indigo-400 shrink-0" />
+                <h4 className="text-sm font-bold text-white">Manual Assignment Controls</h4>
               </div>
-              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shrink-0">
-                12:00 AM Active
+              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 shrink-0">
+                Admin Controlled
               </span>
             </div>
 
             <div className="space-y-2 text-xs font-mono">
-              <div className="flex justify-between items-center gap-2 p-2 rounded-xl bg-zinc-900 border border-zinc-850">
-                <span className="text-zinc-400 text-[11px] shrink-0">UPCOMING QUEUE:</span>
-                <span className="font-bold text-white text-right">15 Days (10 for Employees)</span>
-              </div>
-
-              <div className="flex justify-between items-center gap-2 p-2 rounded-xl bg-zinc-900 border border-zinc-850">
-                <span className="text-zinc-400 text-[11px] shrink-0">TODAY (TOP ROW):</span>
-                <span className="font-bold text-amber-400 truncate max-w-[160px] text-right">
-                  {todaySchedule ? `${todaySchedule.devotionLeaderName} & ${todaySchedule.prayerLeaderName}` : "Not Assigned"}
+              <div className="flex justify-between items-center gap-2 p-2.5 rounded-xl bg-zinc-900 border border-zinc-850">
+                <span className="text-zinc-400 text-[11px] shrink-0">TODAY'S DUTY:</span>
+                <span className="font-bold text-amber-400 truncate max-w-[175px] text-right">
+                  {todaySchedule
+                    ? `${todaySchedule.isAbsent && todaySchedule.substituteDevotionLeaderName ? todaySchedule.substituteDevotionLeaderName : todaySchedule.devotionLeaderName} & ${todaySchedule.isPrayerAbsent && todaySchedule.substitutePrayerLeaderName ? todaySchedule.substitutePrayerLeaderName : todaySchedule.prayerLeaderName}`
+                    : "Not Assigned Yet"}
                 </span>
               </div>
 
-              <div className="flex justify-between items-center gap-2 p-2 rounded-xl bg-zinc-900 border border-zinc-850">
-                <span className="text-zinc-400 text-[11px] shrink-0">SCHEDULE HISTORY:</span>
-                <span className="font-bold text-emerald-400 text-right">{historySchedules.length} Archived Past Shifts</span>
+              <div className="flex justify-between items-center gap-2 p-2.5 rounded-xl bg-zinc-900 border border-zinc-850">
+                <span className="text-zinc-400 text-[11px] shrink-0">UPCOMING SCHEDULED:</span>
+                <span className="font-bold text-white text-right">{upcomingSchedules.length} Mon–Fri Shifts</span>
               </div>
 
-              <div className="flex justify-between items-center gap-2 p-2 rounded-xl bg-zinc-900 border border-zinc-850">
-                <span className="text-zinc-400 text-[11px] shrink-0">DEVOTION CYCLE:</span>
-                <span className="font-bold text-indigo-400 text-right">
-                  Cycle #{rotationState?.devotionCycleNumber || 1} ({rotationState?.devotionAssigned?.length || 0}/{rotationState?.devotionCohort?.length || getSelectedRosterPool().length} Served)
-                </span>
+              <div className="flex justify-between items-center gap-2 p-2.5 rounded-xl bg-zinc-900 border border-zinc-850">
+                <span className="text-zinc-400 text-[11px] shrink-0">ARCHIVED HISTORY:</span>
+                <span className="font-bold text-emerald-400 text-right">{historySchedules.length} Past Shifts</span>
               </div>
 
-              <div className="flex justify-between items-center gap-2 p-2 rounded-xl bg-zinc-900 border border-zinc-850">
-                <span className="text-zinc-400 text-[11px] shrink-0">PRAYER CYCLE:</span>
-                <span className="font-bold text-sky-400 text-right">
-                  Cycle #{rotationState?.prayerCycleNumber || 1} ({rotationState?.prayerAssigned?.length || 0}/{rotationState?.prayerCohort?.length || getSelectedRosterPool().length} Served)
-                </span>
+              <div className="flex justify-between items-center gap-2 p-2.5 rounded-xl bg-zinc-900 border border-zinc-850">
+                <span className="text-zinc-400 text-[11px] shrink-0">ACTIVE TEAM POOL:</span>
+                <span className="font-bold text-sky-400 text-right">{activeEmployees.length} Active Staff</span>
               </div>
-
-              {rotationState?.queuedNewEmployees && rotationState.queuedNewEmployees.length > 0 && (
-                <div className="p-2 rounded-xl bg-indigo-950/40 border border-indigo-800/40 text-[10px]">
-                  <span className="text-indigo-300 font-bold block mb-0.5">NEXT CYCLE QUEUE:</span>
-                  <span className="text-zinc-300">{rotationState.queuedNewEmployees.join(", ")} (Joins Next Cycle)</span>
-                </div>
-              )}
             </div>
 
             <div className="p-3 bg-zinc-900/60 border border-zinc-800 rounded-xl space-y-1 text-[11px]">
-              <div className="flex items-center gap-1.5 text-emerald-400 font-bold font-mono">
+              <div className="flex items-center gap-1.5 text-indigo-300 font-bold font-mono">
                 <CheckCircle className="w-3.5 h-3.5 shrink-0" />
-                <span>Fair Exhaustion Guarantee</span>
+                <span>Explicit Admin Control</span>
               </div>
               <p className="text-zinc-400 leading-relaxed font-sans text-xs">
-                Each employee serves once per role cycle before anyone is chosen again. Newly added staff join the next cycle only. Devotion and prayer on the same day are strictly mutually exclusive.
+                Leaders are never picked randomly. Assign anyone per date, adjust plans anytime, or set a quick substitute whenever someone is absent.
               </p>
             </div>
           </div>
 
-          <div className="pt-4 border-t border-zinc-800/80 space-y-2">
+          <div className="pt-4 border-t border-zinc-800/80 space-y-2 mt-4">
             <button
               type="button"
-              onClick={handleRollDailyQueue}
-              disabled={isRollingQueue}
-              className="w-full py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white font-mono text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md"
+              onClick={() =>
+                todaySchedule
+                  ? openAddModal(todaySchedule)
+                  : openAddModal(undefined, ensureWeekdayDateStr(todayStr))
+              }
+              className="w-full py-2.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-mono text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md"
             >
-              {isRollingQueue ? (
-                <>
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                  <span>Rolling Queue...</span>
-                </>
-              ) : (
-                <>
-                  <Shuffle className="w-3.5 h-3.5" />
-                  <span>Advance 1 Day (Test Roll Now)</span>
-                </>
-              )}
+              <Edit3 className="w-3.5 h-3.5" />
+              <span>{todaySchedule ? "Adjust Today's Leaders" : "Assign Today's Leaders"}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={openBatchManualModal}
+              className="w-full py-2 px-3 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 font-mono text-xs font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <CalendarDays className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Plan Multiple Days Manually</span>
             </button>
 
             <button
               type="button"
               onClick={() => openLoopModal()}
-              className="w-full py-2 px-3 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/40 text-indigo-300 font-mono text-xs font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full py-2 px-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-200 font-mono text-xs font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
               <Repeat className="w-3.5 h-3.5 text-indigo-400" />
-              <span>Loop Current Devotions Forward</span>
+              <span>Repeat Manual Pattern</span>
             </button>
           </div>
         </div>
@@ -1396,9 +1221,7 @@ export default function DevotionManager({ employees, currentUser }: DevotionMana
             onEditSchedule={openAddModal}
             onDeleteSchedule={handleDeleteSchedule}
             onOpenLoopModal={openLoopModal}
-            onRollDailyQueue={handleRollDailyQueue}
             onOpenExportModal={() => setIsLineupExportModalOpen(true)}
-            isRolling={isRollingQueue}
             isAdmin={true}
             currentUserId={currentUser?.uid}
             currentUserName={currentUser?.displayName || currentUser?.email}
@@ -1516,25 +1339,24 @@ export default function DevotionManager({ employees, currentUser }: DevotionMana
                       {/* Actions */}
                       <td className="py-3.5 px-3 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1.5">
-                          {/* Swap / Substitute button */}
                           <button
                             onClick={() => openSubstituteModal(item, "devotion")}
-                            title="Substitute if absent"
-                            className="p-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-rose-400 border border-zinc-800 cursor-pointer"
+                            title="Mark absent & assign substitute"
+                            className="px-2 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 cursor-pointer text-[11px] font-mono font-bold inline-flex items-center gap-1"
                           >
-                            <UserX className="w-3.5 h-3.5" />
+                            <UserX className="w-3 h-3" />
+                            <span>Sub</span>
                           </button>
 
-                          {/* Edit button */}
                           <button
                             onClick={() => openAddModal(item)}
-                            title="Edit details"
-                            className="p-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 cursor-pointer"
+                            title="Change Devotion / Prayer leaders"
+                            className="px-2 py-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border border-zinc-800 cursor-pointer text-[11px] font-mono font-bold inline-flex items-center gap-1"
                           >
-                            <Edit3 className="w-3.5 h-3.5" />
+                            <Edit3 className="w-3 h-3 text-indigo-400" />
+                            <span>Change</span>
                           </button>
 
-                          {/* Delete button */}
                           {item.id && (
                             <button
                               onClick={() => handleDeleteSchedule(item.id!, item.date)}
@@ -1696,12 +1518,24 @@ export default function DevotionManager({ employees, currentUser }: DevotionMana
                 valueId={formDevotionLeaderId}
                 employees={activeEmployees}
                 required
-                placeholder="Search by employee name or ID (e.g. Cedric, 003)..."
+                placeholder="Search or pick Devotion Leader..."
                 onChange={({ id, name }) => {
                   setFormDevotionLeaderId(id);
                   setFormDevotionLeaderName(name);
                 }}
               />
+
+              {/* Swap Devotion & Prayer Leaders Button */}
+              <div className="flex justify-end -my-1">
+                <button
+                  type="button"
+                  onClick={handleSwapFormLeaders}
+                  className="px-2.5 py-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-[11px] font-mono font-bold text-indigo-300 inline-flex items-center gap-1.5 cursor-pointer"
+                >
+                  <ArrowLeftRight className="w-3 h-3" />
+                  <span>Swap Devotion ↔ Prayer</span>
+                </button>
+              </div>
 
               {/* Opening Prayer Leader Search Bar */}
               <EmployeeSearchInput
@@ -1710,12 +1544,20 @@ export default function DevotionManager({ employees, currentUser }: DevotionMana
                 valueId={formPrayerLeaderId}
                 employees={activeEmployees}
                 required
-                placeholder="Search by employee name or ID (e.g. Rayvel, 004)..."
+                placeholder="Search or pick Prayer Leader..."
                 onChange={({ id, name }) => {
                   setFormPrayerLeaderId(id);
                   setFormPrayerLeaderName(name);
                 }}
               />
+
+              {formDevotionLeaderName.trim() &&
+                formPrayerLeaderName.trim() &&
+                formDevotionLeaderName.trim().toLowerCase() === formPrayerLeaderName.trim().toLowerCase() && (
+                  <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-[11px] text-amber-300 font-mono">
+                    Note: The same person is currently selected for both Devotion and Prayer on this date.
+                  </div>
+                )}
 
               {/* Closing Prayer Leader (Optional) */}
               <div className="space-y-1">
@@ -1729,22 +1571,40 @@ export default function DevotionManager({ employees, currentUser }: DevotionMana
                 />
               </div>
 
+              <div className="pt-2 flex flex-wrap items-center justify-between gap-2 border-t border-zinc-800">
+                {editingSchedule ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const target = editingSchedule;
+                      setIsAddingModalOpen(false);
+                      openSubstituteModal(target, "devotion");
+                    }}
+                    className="px-3 py-2 rounded-xl bg-rose-950/50 hover:bg-rose-900/60 border border-rose-500/30 text-rose-300 text-xs font-mono font-bold inline-flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <UserX className="w-3.5 h-3.5" />
+                    <span>Mark Absent & Assign Sub</span>
+                  </button>
+                ) : (
+                  <div />
+                )}
 
-              <div className="pt-2 flex justify-end gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => setIsAddingModalOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-mono font-semibold"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={formSaving}
-                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-mono font-bold"
-                >
-                  {formSaving ? "Saving..." : editingSchedule ? "Update Schedule" : "Create Schedule Entry"}
-                </button>
+                <div className="flex items-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddingModalOpen(false)}
+                    className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-mono font-semibold cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={formSaving}
+                    className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-mono font-bold cursor-pointer"
+                  >
+                    {formSaving ? "Saving..." : editingSchedule ? "Save Changes" : "Save Assignment"}
+                  </button>
+                </div>
               </div>
             </form>
           </div>
@@ -1859,157 +1719,44 @@ export default function DevotionManager({ employees, currentUser }: DevotionMana
 
 
 
-      {/* MODAL 5: AI FAIR CYCLE EXHAUSTION RANDOMIZER */}
-      {isAutoGenerateModalOpen && (
+      {/* MODAL 5: ADMIN MANUAL MULTI-DAY PLANNER */}
+      {isBatchManualModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-zinc-950 border border-emerald-500/30 rounded-2xl w-full max-w-xl p-6 shadow-2xl relative space-y-4 animate-in fade-in duration-200 max-h-[90vh] overflow-y-auto">
+          <div className="bg-zinc-950 border border-emerald-500/30 rounded-2xl w-full max-w-3xl p-6 shadow-2xl relative space-y-4 animate-in fade-in duration-200 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center border-b border-zinc-800 pb-3">
               <div className="flex items-center gap-2 text-emerald-400">
-                <Shuffle className="w-5 h-5" />
-                <h3 className="text-base font-black text-white">
-                  AI Fair Cycle Exhaustion Randomizer
-                </h3>
+                <CalendarDays className="w-5 h-5" />
+                <div>
+                  <h3 className="text-base font-black text-white">
+                    Plan Multiple Days Manually
+                  </h3>
+                  <p className="text-[11px] font-mono text-zinc-400">
+                    Pick exact Devotion & Prayer leaders per weekday (Mon–Fri only). Existing entries load automatically for easy updates.
+                  </p>
+                </div>
               </div>
               <button
-                onClick={() => {
-                  setIsAutoGenerateModalOpen(false);
-                  setFairPreview([]);
-                }}
-                className="p-1 rounded-lg text-zinc-400 hover:text-white"
+                type="button"
+                onClick={() => setIsBatchManualModalOpen(false)}
+                className="p-1 rounded-lg text-zinc-400 hover:text-white cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="space-y-4 text-xs">
-              {/* Rules banner */}
-              <div className="p-3.5 bg-emerald-950/20 border border-emerald-500/30 rounded-xl space-y-2">
-                <div className="flex items-center gap-1.5 text-emerald-400 font-bold font-mono text-[11px] uppercase">
-                  <CheckCircle className="w-4 h-4" />
-                  <span>Mathematical Fairness & Exhaustion Guarantee</span>
-                </div>
-                <ul className="text-zinc-300 text-[11px] space-y-1 list-disc pl-4 leading-relaxed">
-                  <li>
-                    <strong>No Same-Day Clashes:</strong> If someone is the Devotion Leader on a date, they are guaranteed <em>never</em> to be the Prayer Leader on that same date.
-                  </li>
-                  <li>
-                    <strong>Full Exhaustion Cycle:</strong> All members in the roster pool must be selected once before <em>any</em> person's name can repeat in a new cycle.
-                  </li>
-                  <li>
-                    <strong>Boundary Smoothing:</strong> Prevents consecutive repeats between the last day of cycle 1 and the first day of cycle 2.
-                  </li>
-                </ul>
-              </div>
-
-              {/* Roster Pool Selector */}
-              <div className="space-y-2">
-                <label className="text-xs font-mono font-bold text-zinc-400 uppercase">
-                  1. Select Team Roster Pool
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setRosterSource("official");
-                      setFairPreview([]);
-                    }}
-                    className={`p-3 rounded-xl border text-left transition-all ${
-                      rosterSource === "official"
-                        ? "bg-indigo-600/20 border-indigo-500 text-white font-bold"
-                        : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200"
-                    }`}
-                  >
-                    <div className="font-mono text-xs">Official Flyer Team</div>
-                    <div className="text-[10px] text-zinc-400 font-normal mt-0.5">
-                      10 staff names matching physical layout
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setRosterSource("employees");
-                      setFairPreview([]);
-                    }}
-                    className={`p-3 rounded-xl border text-left transition-all ${
-                      rosterSource === "employees"
-                        ? "bg-indigo-600/20 border-indigo-500 text-white font-bold"
-                        : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200"
-                    }`}
-                  >
-                    <div className="font-mono text-xs">Directory Staff</div>
-                    <div className="text-[10px] text-zinc-400 font-normal mt-0.5">
-                      {activeEmployees.length} active registered accounts
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setRosterSource("custom");
-                      setFairPreview([]);
-                    }}
-                    className={`p-3 rounded-xl border text-left transition-all ${
-                      rosterSource === "custom"
-                        ? "bg-indigo-600/20 border-indigo-500 text-white font-bold"
-                        : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200"
-                    }`}
-                  >
-                    <div className="font-mono text-xs">Custom Names</div>
-                    <div className="text-[10px] text-zinc-400 font-normal mt-0.5">
-                      Type custom list of names
-                    </div>
-                  </button>
-                </div>
-
-                {rosterSource === "custom" && (
-                  <div className="pt-1">
-                    <input
-                      type="text"
-                      value={customRosterInput}
-                      onChange={(e) => {
-                        setCustomRosterInput(e.target.value);
-                        setFairPreview([]);
-                      }}
-                      placeholder="e.g. FRANKIE, RAYVEL, CEDRIC, ROLAND, ISRAEL, JR, AARON, JERICHO, MARK, JAO"
-                      className="w-full text-xs font-mono px-3.5 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl text-white focus:outline-none"
-                    />
-                    <span className="text-[10px] text-zinc-500 font-mono mt-1 block">
-                      Separate names with commas. Need at least 2 names.
-                    </span>
-                  </div>
-                )}
-
-                {/* Show pool chip badges */}
-                <div className="p-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800">
-                  <span className="text-[10px] font-mono text-zinc-500 uppercase block mb-1.5 font-bold">
-                    Active Roster Pool ({getSelectedRosterPool().length} Members):
-                  </span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {getSelectedRosterPool().map((name, i) => (
-                      <span
-                        key={i}
-                        className="px-2 py-0.5 rounded-md bg-zinc-800 text-zinc-200 text-[10px] font-mono font-bold"
-                      >
-                        {name}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Start Date & Days Count */}
+            <form onSubmit={handleSaveBatchManual} className="space-y-4 text-xs">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="text-xs font-mono font-bold text-zinc-400 uppercase">
-                    2. Starting Date
+                    Starting Date (Mon–Fri)
                   </label>
                   <input
                     type="date"
-                    value={autoGenStartDate}
+                    value={batchStartDate}
                     onChange={(e) => {
-                      setAutoGenStartDate(e.target.value);
-                      setFairPreview([]);
+                      const nextDate = ensureWeekdayDateStr(e.target.value);
+                      setBatchStartDate(nextDate);
+                      setBatchRows(buildBatchManualRows(nextDate, batchDaysCount));
                     }}
                     className="w-full text-xs font-mono px-3.5 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl text-white focus:outline-none"
                   />
@@ -2017,121 +1764,142 @@ export default function DevotionManager({ employees, currentUser }: DevotionMana
 
                 <div className="space-y-1">
                   <label className="text-xs font-mono font-bold text-zinc-400 uppercase">
-                    3. Duration to Schedule
+                    Number of Workdays
                   </label>
                   <select
-                    value={autoGenDaysCount}
+                    value={batchDaysCount}
                     onChange={(e) => {
-                      setAutoGenDaysCount(Number(e.target.value));
-                      setFairPreview([]);
+                      const count = Number(e.target.value);
+                      setBatchDaysCount(count);
+                      setBatchRows(buildBatchManualRows(batchStartDate, count));
                     }}
                     className="w-full text-xs font-mono px-3.5 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl text-white focus:outline-none"
                   >
-                    <option value={5}>5 Days (1 Week / 5 Business Shifts)</option>
-                    <option value={10}>10 Days (2 Weeks / 10 Business Shifts)</option>
-                    <option value={15}>15 Days (3 Weeks / Admin Horizon)</option>
-                    <option value={20}>20 Days (4 Weeks / 1 Month Horizon)</option>
-                    <option value={30}>30 Days (6 Weeks / Extended Horizon)</option>
+                    <option value={5}>5 Workdays (1 Week)</option>
+                    <option value={10}>10 Workdays (2 Weeks)</option>
+                    <option value={15}>15 Workdays (3 Weeks)</option>
+                    <option value={20}>20 Workdays (4 Weeks)</option>
                   </select>
                 </div>
               </div>
 
-              <div className="p-2.5 rounded-xl bg-emerald-950/20 border border-emerald-500/30 flex items-center gap-2">
-                <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span className="text-xs text-emerald-300 font-mono font-bold">
-                  Mon–Fri Workdays Only (Saturday & Sunday Rest Days Skipped)
-                </span>
-              </div>
+              <div className="space-y-2 max-h-[45vh] overflow-y-auto pr-1">
+                {batchRows.map((row, idx) => {
+                  const [y, m, d] = row.date.split("-").map(Number);
+                  const dayLabel = new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: "short" });
+                  const samePerson =
+                    row.devotionName.trim() &&
+                    row.prayerName.trim() &&
+                    row.devotionName.trim().toLowerCase() === row.prayerName.trim().toLowerCase();
 
-              {/* Preview trigger button */}
-              <div className="pt-2">
-                <button
-                  type="button"
-                  onClick={() => handleGenerateFairPreview()}
-                  className="w-full py-2.5 px-4 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-emerald-400 border border-emerald-500/30 text-xs font-mono font-bold flex items-center justify-center gap-2 transition-all cursor-pointer"
-                >
-                  <Shuffle className="w-4 h-4" />
-                  <span>
-                    {fairPreview.length > 0 ? "Re-Shuffle New Fair Permutation" : "Generate Fair Randomization Preview"}
-                  </span>
-                </button>
-              </div>
-
-              {/* Live Preview of Fair Cycles */}
-              {fairPreview.length > 0 && (
-                <div className="space-y-2 pt-2 border-t border-zinc-800">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-mono text-emerald-400 font-bold uppercase flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5" />
-                      Generated Fair Permutation Preview ({fairPreview.length} Days)
-                    </span>
-                    <span className="text-[10px] font-mono text-zinc-400">
-                      Cycle Size: {getSelectedRosterPool().length} Members
-                    </span>
-                  </div>
-
-                  <div className="max-h-56 overflow-y-auto space-y-1 pr-1 border border-zinc-800 rounded-xl p-2 bg-zinc-900/50 font-mono text-[11px]">
-                    {fairPreview.map((item, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-center justify-between p-2 rounded-lg bg-zinc-950/80 border border-zinc-850"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="text-zinc-500 text-[10px]">#{idx + 1}</span>
-                          <span className="text-zinc-200 font-bold">{item.date}</span>
-                          <span className="text-[9px] px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300">
-                            Cycle {item.cycleNumber} ({item.dayInCycle}/{item.cycleTotal})
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span>
-                            <strong className="text-indigo-400">DEV:</strong> {item.devotion}
-                          </span>
-                          <span>
-                            <strong className="text-sky-400">PRAY:</strong> {item.prayer}
-                          </span>
-                        </div>
+                  return (
+                    <div
+                      key={row.date}
+                      className={`p-3 rounded-xl border grid grid-cols-1 md:grid-cols-12 gap-2.5 items-center ${
+                        samePerson
+                          ? "bg-amber-950/20 border-amber-500/40"
+                          : "bg-zinc-900/70 border-zinc-800"
+                      }`}
+                    >
+                      <div className="md:col-span-3 flex items-center gap-2 font-mono">
+                        <span className="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 text-[10px] font-bold uppercase">
+                          {dayLabel}
+                        </span>
+                        <span className="font-bold text-white">{row.date}</span>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              )}
 
-              {/* Commit buttons */}
+                      <div className="md:col-span-4">
+                        <label className="text-[9px] font-mono text-indigo-400 uppercase block mb-0.5 font-bold">
+                          Devotion Leader
+                        </label>
+                        <select
+                          value={row.devotionId || (row.devotionName ? `__custom__${row.devotionName}` : "")}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val.startsWith("__custom__")) return;
+                            handleBatchLeaderChange(idx, "devotion", val);
+                          }}
+                          className="w-full px-2.5 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs text-white font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        >
+                          <option value="">-- Select Devotion Leader --</option>
+                          {row.devotionName && !row.devotionId && (
+                            <option value={`__custom__${row.devotionName}`}>{row.devotionName}</option>
+                          )}
+                          {activeEmployees.map((emp) => (
+                            <option key={emp.id} value={emp.id}>
+                              #{emp.employeeNumber} · {emp.fullName}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="md:col-span-1 flex justify-center md:pt-4">
+                        <button
+                          type="button"
+                          onClick={() => handleSwapBatchRow(idx)}
+                          title="Swap Devotion & Prayer on this day"
+                          className="p-1.5 rounded-lg bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 text-indigo-300 cursor-pointer"
+                        >
+                          <ArrowLeftRight className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      <div className="md:col-span-4">
+                        <label className="text-[9px] font-mono text-sky-400 uppercase block mb-0.5 font-bold">
+                          Prayer Leader
+                        </label>
+                        <select
+                          value={row.prayerId || (row.prayerName ? `__custom__${row.prayerName}` : "")}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val.startsWith("__custom__")) return;
+                            handleBatchLeaderChange(idx, "prayer", val);
+                          }}
+                          className="w-full px-2.5 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs text-white font-mono focus:outline-none focus:ring-1 focus:ring-sky-500"
+                        >
+                          <option value="">-- Select Prayer Leader --</option>
+                          {row.prayerName && !row.prayerId && (
+                            <option value={`__custom__${row.prayerName}`}>{row.prayerName}</option>
+                          )}
+                          {activeEmployees.map((emp) => (
+                            <option key={emp.id} value={emp.id}>
+                              #{emp.employeeNumber} · {emp.fullName}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
               <div className="pt-3 flex justify-between items-center border-t border-zinc-800">
                 <button
                   type="button"
-                  onClick={() => {
-                    setIsAutoGenerateModalOpen(false);
-                    setFairPreview([]);
-                  }}
+                  onClick={() => setIsBatchManualModalOpen(false)}
                   className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-mono font-semibold cursor-pointer"
                 >
                   Cancel
                 </button>
-
                 <button
-                  type="button"
-                  disabled={autoGenerating}
-                  onClick={handleCommitFairRoster}
-                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-mono font-bold flex items-center gap-2 cursor-pointer shadow-md"
+                  type="submit"
+                  disabled={batchSaving}
+                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-mono font-bold flex items-center gap-2 cursor-pointer shadow-md"
                 >
                   <Check className="w-4 h-4" />
                   <span>
-                    {autoGenerating 
-                      ? "Publishing Schedule..." 
-                      : fairPreview.length > 0 
-                        ? `Publish ${fairPreview.length} Days to Calendar` 
-                        : "Generate & Publish Schedule"}
+                    {batchSaving
+                      ? "Saving..."
+                      : `Save ${batchRows.filter((r) => r.devotionName && r.prayerName).length} Assigned Days`}
                   </span>
                 </button>
               </div>
-            </div>
+            </form>
           </div>
         </div>
       )}
 
-      {/* MODAL 3: CREATE NEW DEVOTION LOOP (MONDAY–FRIDAY ONLY) */}
+      {/* MODAL 3: REPEAT MANUAL DEVOTION PATTERN (MONDAY–FRIDAY ONLY) */}
       {isLoopModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-zinc-950 border border-zinc-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 shadow-2xl relative space-y-5 animate-in fade-in duration-200">
@@ -2141,9 +1909,9 @@ export default function DevotionManager({ employees, currentUser }: DevotionMana
                   <Repeat className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="text-base font-black text-white">Create New Devotion Loop</h3>
+                  <h3 className="text-base font-black text-white">Repeat Manual Devotion Pattern</h3>
                   <p className="text-[11px] font-mono text-zinc-400">
-                    Loop custom devotion entries forward • Strictly Monday–Friday (Sat & Sun Skipped)
+                    Repeat your exact manual leader sequence forward • Monday–Friday only
                   </p>
                 </div>
               </div>
@@ -2160,9 +1928,9 @@ export default function DevotionManager({ employees, currentUser }: DevotionMana
               <div className="p-3 rounded-xl bg-indigo-950/30 border border-indigo-500/30 flex items-start gap-2.5 text-xs text-zinc-300">
                 <Sparkles className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
                 <div className="leading-relaxed font-sans">
-                  This tool takes your ordered sequence of devotion & prayer leader pairs and repeats it seamlessly into future business days. 
+                  Define your ordered devotion & prayer leader pairs below, and repeat that exact sequence forward across upcoming weekdays (no randomization).
                   <strong className="text-emerald-400 block font-mono text-[11px] mt-1">
-                    ✓ Saturday and Sunday Rest Days are strictly skipped. Devotions are only scheduled Monday through Friday.
+                    Saturday and Sunday Rest Days are strictly skipped.
                   </strong>
                 </div>
               </div>
@@ -2171,7 +1939,7 @@ export default function DevotionManager({ employees, currentUser }: DevotionMana
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-mono font-bold text-zinc-300 uppercase tracking-wide flex items-center gap-2">
-                    <span>1. Base Devotion Sequence ({loopBasePattern.length} Days in Loop)</span>
+                    <span>1. Base Manual Pairs ({loopBasePattern.length} Days in Sequence)</span>
                   </label>
                   <button
                     type="button"
@@ -2190,40 +1958,20 @@ export default function DevotionManager({ employees, currentUser }: DevotionMana
                 {loopBasePattern.length === 0 ? (
                   <div className="p-4 rounded-xl border border-dashed border-zinc-800 text-center space-y-2">
                     <p className="text-xs text-zinc-400 font-mono">
-                      No base pattern detected. Click below to add pairs or load active team members.
+                      Add a pair above to define your manual repeating sequence.
                     </p>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const emps = activeEmployees.map((e) => e.fullName.trim());
-                        const base: { devotion: string; prayer: string }[] = [];
-                        for (let i = 0; i < Math.min(5, emps.length); i++) {
-                          base.push({
-                            devotion: emps[i],
-                            prayer: emps[(i + 1) % emps.length],
-                          });
-                        }
-                        setLoopBasePattern(base);
-                        handleUpdateLoopPreview(base, loopStartDate, loopDaysCount);
-                      }}
-                      className="px-3 py-1.5 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 text-xs font-mono font-bold inline-flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Load Active Staff Pairs</span>
-                    </button>
                   </div>
                 ) : (
                   <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
                     {loopBasePattern.map((pair, idx) => (
                       <div
                         key={idx}
-                        className="flex items-center gap-2 p-2 rounded-xl bg-zinc-900/80 border border-zinc-800 text-xs font-mono"
+                        className="flex flex-col sm:flex-row sm:items-center gap-2 p-2 rounded-xl bg-zinc-900/80 border border-zinc-800 text-xs font-mono"
                       >
                         <span className="w-6 text-zinc-500 font-bold text-center">#{idx + 1}</span>
                         <div className="flex-1 flex items-center gap-1.5">
                           <span className="text-[10px] text-indigo-400 font-bold shrink-0">DEV:</span>
-                          <input
-                            type="text"
+                          <select
                             value={pair.devotion}
                             onChange={(e) => {
                               const updated = [...loopBasePattern];
@@ -2231,14 +1979,23 @@ export default function DevotionManager({ employees, currentUser }: DevotionMana
                               setLoopBasePattern(updated);
                               handleUpdateLoopPreview(updated, loopStartDate, loopDaysCount);
                             }}
-                            placeholder="Devotion Leader"
-                            className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-2.5 py-1 text-white text-xs focus:outline-none"
-                          />
+                            className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-2 py-1 text-white text-xs focus:outline-none"
+                          >
+                            <option value="">-- Select Devotion --</option>
+                            {pair.devotion &&
+                              !activeEmployees.some((e) => e.fullName === pair.devotion) && (
+                                <option value={pair.devotion}>{pair.devotion}</option>
+                              )}
+                            {activeEmployees.map((emp) => (
+                              <option key={emp.id} value={emp.fullName}>
+                                {emp.fullName}
+                              </option>
+                            ))}
+                          </select>
                         </div>
                         <div className="flex-1 flex items-center gap-1.5">
                           <span className="text-[10px] text-sky-400 font-bold shrink-0">PRAY:</span>
-                          <input
-                            type="text"
+                          <select
                             value={pair.prayer}
                             onChange={(e) => {
                               const updated = [...loopBasePattern];
@@ -2246,9 +2003,19 @@ export default function DevotionManager({ employees, currentUser }: DevotionMana
                               setLoopBasePattern(updated);
                               handleUpdateLoopPreview(updated, loopStartDate, loopDaysCount);
                             }}
-                            placeholder="Prayer Leader"
-                            className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-2.5 py-1 text-white text-xs focus:outline-none"
-                          />
+                            className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-2 py-1 text-white text-xs focus:outline-none"
+                          >
+                            <option value="">-- Select Prayer --</option>
+                            {pair.prayer &&
+                              !activeEmployees.some((e) => e.fullName === pair.prayer) && (
+                                <option value={pair.prayer}>{pair.prayer}</option>
+                              )}
+                            {activeEmployees.map((emp) => (
+                              <option key={emp.id} value={emp.fullName}>
+                                {emp.fullName}
+                              </option>
+                            ))}
+                          </select>
                         </div>
                         {loopBasePattern.length > 1 && (
                           <button
@@ -2258,7 +2025,7 @@ export default function DevotionManager({ employees, currentUser }: DevotionMana
                               setLoopBasePattern(updated);
                               handleUpdateLoopPreview(updated, loopStartDate, loopDaysCount);
                             }}
-                            className="p-1 rounded text-zinc-500 hover:text-rose-400 cursor-pointer"
+                            className="p-1 rounded text-zinc-500 hover:text-rose-400 cursor-pointer self-end sm:self-center"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>

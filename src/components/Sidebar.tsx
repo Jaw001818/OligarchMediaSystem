@@ -16,8 +16,7 @@ import {
   Moon,
   BookOpen,
   Wallet,
-  Trash2,
-  MessageSquare
+  Trash2
 } from "lucide-react";
 
 interface SidebarProps {
@@ -65,7 +64,6 @@ export default function Sidebar({
       items: [
         { id: "devotion", label: "Devotion & Prayer", icon: BookOpen },
         { id: "requests", label: "Staff Requests", icon: MailWarning, count: pendingRequestsCount },
-        { id: "chat", label: "Studio Chat / Messages", icon: MessageSquare, badge: "Upcoming" },
         { id: "trash", label: "Recycle Bin", icon: Trash2 },
         { id: "settings", label: "System Config", icon: Settings },
       ]

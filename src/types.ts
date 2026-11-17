@@ -1,3 +1,5 @@
+export type EmployeePresenceStatus = "active" | "meeting" | "break" | "focus";
+
 export interface Employee {
   id?: string;
   employeeNumber: string;
@@ -16,10 +18,20 @@ export interface Employee {
   otRate: number;
   status: "Active" | "Inactive" | "Resigned";
   profilePicture: string;
-  employmentType: "Full-time" | "Part-time" | "Contract" | "Intern";
+  employmentType: "Full-time" | "Part-time" | "Contract" | "Intern" | "Training";
+  isTraining?: boolean;
+  trainingMonths?: 1 | 2;
+  trainingStartDate?: string;
+  trainingEndDate?: string;
+  trainingExtended?: boolean;
+  trainingExtensionReason?: string;
+  trainingGraduatedDate?: string;
   dateHired: string;
   isAdmin?: boolean;
   pin?: string;
+  presenceStatus?: EmployeePresenceStatus;
+  presenceNote?: string;
+  presenceUpdatedAt?: number;
   updatedAt?: string | number;
   // Individual Work Schedule fields
   scheduleType?: "default" | "custom" | "weekly";
@@ -172,6 +184,7 @@ export interface Payroll {
   allowanceAdjustmentMethod?: "Full" | "Removed";
   thirteenthMonthPay?: number;
   finalSalary: number;
+  isTrainingPayroll?: boolean;
   status: PayrollStatus;
   generatedAt: string;
 }
@@ -405,4 +418,102 @@ export interface DeletedRecord {
   data: any;
   deletedAt: string;
   deletedBy?: string;
+}
+
+export interface ChatChannel {
+  id: string;
+  name: string;
+  description?: string;
+  type: "channel" | "direct";
+  isPrivate?: boolean;
+  memberIds?: string[];
+  memberNames?: string[];
+  createdAt: string | number;
+  createdBy: string;
+  lastMessage?: string;
+  lastMessageAt?: string | number;
+  lastMessageSender?: string;
+  unreadCount?: number;
+}
+
+export interface BoundingBox {
+  x: number;      // percentage (0 - 100)
+  y: number;      // percentage (0 - 100)
+  width: number;  // percentage (0 - 100)
+  height: number; // percentage (0 - 100)
+}
+
+export interface DesignReviewComment {
+  id: string;
+  authorId: string;
+  authorName: string;
+  authorAvatar?: string;
+  authorRole?: string;
+  text: string;
+  createdAt: string | number;
+  pinX?: number; // percentage (0 - 100) on the design canvas
+  pinY?: number; // percentage (0 - 100) on the design canvas
+  pinNumber?: number;
+  box?: BoundingBox; // Google Drive / Figma style bounding box selection
+  videoTimestamp?: number; // in seconds (e.g. 14.5s) for video review
+  videoTimestampFormatted?: string; // e.g. "00:14"
+  status?: "feedback" | "change_requested" | "approved" | "resolved";
+  resolved?: boolean;
+}
+
+export interface ChatMessage {
+  id: string;
+  channelId: string;
+  senderId: string;
+  senderName: string;
+  senderAvatar?: string;
+  senderRole?: "admin" | "artist" | "employee";
+  text: string;
+  fileUrl?: string;
+  fileName?: string;
+  fileType?: string;
+  fileSize?: string;
+  isDesignReview?: boolean;
+  isVideoReview?: boolean;
+  designTitle?: string;
+  designStatus?: "Draft" | "Under Review" | "Needs Revision" | "Approved";
+  designComments?: DesignReviewComment[];
+  reactions?: Record<string, string[]>; // emoji -> array of employee/admin names
+  isPinned?: boolean;
+  isCallInvite?: boolean;
+  callId?: string;
+  callType?: "video" | "audio";
+  createdAt: string | number;
+}
+
+export interface StudioCall {
+  id: string;
+  channelId: string;
+  channelName: string;
+  isGroupMeeting?: boolean;
+  callType: "video" | "audio";
+  callerId: string;
+  callerName: string;
+  callerAvatar?: string;
+  calleeId?: string;
+  calleeName?: string;
+  targetIds?: string[];
+  participants: string[];
+  participantNames?: Record<string, string>;
+  participantAvatars?: Record<string, string>;
+  participantMedia?: Record<string, { micMuted?: boolean; camOff?: boolean }>;
+  status: "ringing" | "active" | "ended" | "declined" | "missed";
+  createdAt: number;
+  updatedAt: number;
+  endedAt?: number;
+}
+
+export interface StudioCallSignal {
+  id?: string;
+  callId: string;
+  fromId: string;
+  toId: string;
+  kind: "offer" | "answer" | "candidate";
+  payload: any;
+  createdAt: number;
 }

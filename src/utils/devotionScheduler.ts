@@ -330,12 +330,9 @@ export function generateNextRotationPair(
 }
 
 /**
- * Automatic Maintenance Engine:
- * - Checks eligible employees (must be >= 2).
+ * Automatic Date Maintenance Engine:
  * - Archives expired schedules (date < todayStr) to "completed", NEVER deleting them.
- * - Automatically shifts any Saturday/Sunday upcoming schedules onto Monday–Friday (since Sat/Sun are Rest Days).
- * - Ensures exactly 15 upcoming weekday schedules exist in the database (10 for employees, 15 for admin).
- * - Uses a distributed lock in Firestore to prevent duplicate generation across multiple clients.
+ * - Does NOT auto-generate random devotion or prayer leaders; Admin explicitly controls who leads each day.
  */
 let isLocalMaintenanceRunning = false;
 let lastLocalMaintainTimestamp = 0;
@@ -343,9 +340,9 @@ let lastLocalMaintainTimestamp = 0;
 export async function maintainRollingSchedule(
   db: Firestore,
   todayStr: string,
-  employees: Employee[],
+  _employees: Employee[],
   currentSchedules: DevotionSchedule[],
-  targetUpcomingCount: number = 15
+  _targetUpcomingCount: number = 15
 ): Promise<{ success: boolean; addedCount: number; warning?: string }> {
   if (isLocalMaintenanceRunning) {
     return { success: true, addedCount: 0 };
@@ -355,20 +352,11 @@ export async function maintainRollingSchedule(
     return { success: true, addedCount: 0 };
   }
 
-  const activeEmps = employees.filter(e => (e.status || "Active") === "Active");
-  if (activeEmps.length < 2) {
-    return {
-      success: false,
-      addedCount: 0,
-      warning: "Insufficient eligible employees: at least 2 active staff members are required to schedule Devotion and Prayer without conflict."
-    };
-  }
-
   isLocalMaintenanceRunning = true;
   lastLocalMaintainTimestamp = nowTs;
 
   try {
-    // 1. Archive past schedules: DO NOT DELETE, update status to "completed"
+    // Archive past schedules: DO NOT DELETE, update status to "completed"
     const pastUncompleted = currentSchedules.filter(s => s.date < todayStr && s.status !== "completed");
     if (pastUncompleted.length > 0) {
       for (const past of pastUncompleted) {
@@ -381,132 +369,44 @@ export async function maintainRollingSchedule(
       }
     }
 
-    // 2. Filter upcoming schedules (preserve all dates configured by admin)
-    const upcomingSchedules = currentSchedules
-      .filter(s => s.date >= todayStr && s.status !== "completed")
-      .sort((a, b) => a.date.localeCompare(b.date));
-
-    // If no upcoming schedules exist (e.g. admin is clearing devotions to input a fresh schedule),
-    // or if upcoming schedules are already present, do NOT auto-inject unprompted rows.
-    // Schedules are populated when the admin inputs or loops them.
-    if (upcomingSchedules.length === 0 || upcomingSchedules.length >= 10) {
-      return { success: true, addedCount: 0 };
-    }
-
-    // 3. Acquire Distributed Lock (devotion_settings/maintenance_lock) to prevent duplicate runs
-    const lockDocRef = doc(db, "devotion_settings", "maintenance_lock");
-    const now = Date.now();
-    try {
-      const lockSnap = await getDoc(lockDocRef);
-      if (lockSnap.exists()) {
-        const lockData = lockSnap.data();
-        if (lockData.isLocked && lockData.expiresAt > now) {
-          return { success: true, addedCount: 0 };
-        }
-      }
-      await setDoc(lockDocRef, {
-        isLocked: true,
-        expiresAt: now + 12000,
-        lockedAt: new Date().toISOString()
-      });
-    } catch (lockErr) {
-      console.warn("Lock acquisition note:", lockErr);
-    }
-
-  try {
-    // 4. Load or initialize rotation state
-    const stateDocRef = doc(db, "devotion_settings", "rotation_state");
-    let rotationState: DevotionRotationState;
-    try {
-      const stateSnap = await getDoc(stateDocRef);
-      if (stateSnap.exists()) {
-        rotationState = initializeRotationState(
-          activeEmps.map(e => e.fullName.trim()),
-          stateSnap.data() as DevotionRotationState
-        );
-      } else {
-        rotationState = initializeRotationState(activeEmps.map(e => e.fullName.trim()));
-      }
-    } catch {
-      rotationState = initializeRotationState(activeEmps.map(e => e.fullName.trim()));
-    }
-
-    // 5. Generate missing weekday schedule rows up to targetUpcomingCount (15)
-    let currentUpcoming = [...upcomingSchedules];
-    let lastDateStr = currentUpcoming.length > 0 
-      ? currentUpcoming[currentUpcoming.length - 1].date 
-      : addDaysToDateStr(ensureWeekdayDateStr(todayStr), -1, true);
-
-    let addedCount = 0;
-    const rowsToAdd = targetUpcomingCount - currentUpcoming.length;
-
-    for (let i = 0; i < rowsToAdd; i++) {
-      lastDateStr = addDaysToDateStr(lastDateStr, 1, true);
-      
-      // Prevent duplicate generation if date already exists in schedule list
-      if (currentUpcoming.some(s => s.date === lastDateStr)) {
-        continue;
-      }
-
-      const lastDev = currentUpcoming.length > 0 ? currentUpcoming[currentUpcoming.length - 1].devotionLeaderName : undefined;
-      const lastPray = currentUpcoming.length > 0 ? currentUpcoming[currentUpcoming.length - 1].prayerLeaderName : undefined;
-
-      const nextPair = generateNextRotationPair(activeEmps, rotationState, lastDev, lastPray);
-      rotationState = nextPair.updatedState;
-
-      // Try matching employee IDs for push notifications and account badges
-      const matchedDev = activeEmps.find(e => e.fullName.toLowerCase() === nextPair.devotion.toLowerCase());
-      const matchedPray = activeEmps.find(e => e.fullName.toLowerCase() === nextPair.prayer.toLowerCase());
-
-      const newScheduleDoc: Partial<DevotionSchedule> = {
-        date: lastDateStr,
-        devotionLeaderId: matchedDev?.id || "",
-        devotionLeaderName: nextPair.devotion,
-        prayerLeaderId: matchedPray?.id || "",
-        prayerLeaderName: nextPair.prayer,
-        closingPrayerLeaderName: "",
-        topic: "Daily Devotion & Shift Alignment",
-        scripture: "Philippians 4:6-7",
-        notes: `Fair Cycle Rotation (Devotion Cycle #${nextPair.devCycleNumber}, Prayer Cycle #${nextPair.prayCycleNumber})`,
-        imageUrl: "/assets/aistudio/image_17b76ed3.png",
-        status: "upcoming",
-        cycleDevotionNumber: nextPair.devCycleNumber,
-        cyclePrayerNumber: nextPair.prayCycleNumber,
-        cycleDevotionCohort: [...rotationState.devotionCohort],
-        cyclePrayerCohort: [...rotationState.prayerCohort],
-        isAbsent: false,
-        isPrayerAbsent: false,
-        updatedAt: new Date().toISOString(),
-        updatedBy: "System (Rolling Maintenance)"
-      };
-
-      const dateKeyedDoc: DevotionSchedule = {
-        ...(newScheduleDoc as DevotionSchedule),
-        id: lastDateStr,
-        date: lastDateStr
-      };
-      await setDoc(doc(db, "devotion_schedules", lastDateStr), dateKeyedDoc, { merge: true });
-      currentUpcoming.push(dateKeyedDoc);
-      addedCount++;
-    }
-
-    // 6. Save updated rotation state
-    await setDoc(stateDocRef, {
-      ...rotationState,
-      lastMaintainedAt: new Date().toISOString()
-    });
-
-    return { success: true, addedCount };
+    return { success: true, addedCount: 0 };
   } catch (err) {
     console.error("Schedule maintenance error:", err);
     return { success: false, addedCount: 0, warning: "Failed to maintain schedule." };
   } finally {
-    // Release Lock
-    setDoc(lockDocRef, { isLocked: false, expiresAt: 0 }).catch(() => {});
-  }
-  } finally {
     isLocalMaintenanceRunning = false;
   }
+}
+
+/**
+ * Computes the next open Monday-Friday date for manual admin scheduling.
+ * If today is a weekday and not yet scheduled, defaults to today; otherwise advances to next open weekday.
+ */
+export function getNextManualScheduleDate(
+  existingSchedules: { date: string; status?: string }[],
+  todayStr: string
+): string {
+  const scheduledDates = new Set(
+    (existingSchedules || []).map((s) => s.date).filter(Boolean)
+  );
+  let candidate = ensureWeekdayDateStr(todayStr);
+  if (!scheduledDates.has(candidate)) {
+    return candidate;
+  }
+  const upcomingSorted = (existingSchedules || [])
+    .filter((s) => s.date >= todayStr && s.status !== "completed")
+    .map((s) => s.date)
+    .sort();
+  if (upcomingSorted.length > 0) {
+    let nextCandidate = addDaysToDateStr(upcomingSorted[upcomingSorted.length - 1], 1, true);
+    let guard = 0;
+    while (scheduledDates.has(nextCandidate) && guard < 60) {
+      nextCandidate = addDaysToDateStr(nextCandidate, 1, true);
+      guard++;
+    }
+    return nextCandidate;
+  }
+  return addDaysToDateStr(candidate, 1, true);
 }
 
 /**
